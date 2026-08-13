@@ -3,13 +3,18 @@ Data/*
 !Data/ai_mlp/
 Fig/
 
-# Data/ai_mlp 里默认忽略大文件，再放行小件
+# Data/ai_mlp：先全忽略，再放行小文件和非 epoch 的 pt
 Data/ai_mlp/**
 !Data/ai_mlp/config.json
 !Data/ai_mlp/scaler.json
 !Data/ai_mlp/history.json
+!Data/ai_mlp/*.pt
+Data/ai_mlp/epoch_*.pt
+
 !Data/ai_mlp/ckpts/
+Data/ai_mlp/ckpts/**
 !Data/ai_mlp/ckpts/latest.json
+Data/ai_mlp/ckpts/epoch_*.pt
 
 # Python 缓存
 __pycache__/
