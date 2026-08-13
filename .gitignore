@@ -1,3 +1,7 @@
 # 仿真输出与绘图结果，不上传
 Data/
 Fig/
+
+# Python 缓存
+__pycache__/
+*.pyc
