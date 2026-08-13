@@ -1,6 +1,15 @@
-# 仿真输出与绘图结果，不上传
-Data/
+# 仿真输出与绘图结果
+Data/*
+!Data/ai_mlp/
 Fig/
+
+# Data/ai_mlp 里默认忽略大文件，再放行小件
+Data/ai_mlp/**
+!Data/ai_mlp/config.json
+!Data/ai_mlp/scaler.json
+!Data/ai_mlp/history.json
+!Data/ai_mlp/ckpts/
+!Data/ai_mlp/ckpts/latest.json
 
 # Python 缓存
 __pycache__/

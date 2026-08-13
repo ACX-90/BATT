@@ -1,0 +1,32 @@
+{
+  "scheme": "B",
+  "data_dir": "Data/grid",
+  "out_dir": "Data/ai_mlp",
+  "index_name": "index.csv",
+  "use_true_inputs": true,
+  "voltage_target": "meas",
+  "dt_s": 0.1,
+  "r0_min": 1e-05,
+  "r1_min": 1e-05,
+  "c1_min": 100.0,
+  "c1_star": 28000.0,
+  "r0_ref": 0.0008,
+  "r1_ref": 0.00065,
+  "hidden": [
+    64,
+    64
+  ],
+  "dropout": 0.0,
+  "epochs": 100,
+  "pretrain_epochs": 5,
+  "batch_size": 8,
+  "lr": 0.002,
+  "lr_c1": 0.0002,
+  "weight_decay": 1e-06,
+  "grad_clip": 1.0,
+  "lambda_smooth": 0.001,
+  "val_ratio": 0.2,
+  "seed": 42,
+  "tbptt": 0,
+  "device": "cpu"
+}
