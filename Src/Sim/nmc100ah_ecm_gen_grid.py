@@ -90,6 +90,17 @@ def build_grid(n_soc: int, n_temp: int) -> tuple[np.ndarray, np.ndarray]:
     return soc, temp
 
 
+def clear_output_dir(out_dir: Path) -> int:
+    """删掉输出目录里已有的网格 CSV，避免换档数后旧文件残留。"""
+    if not out_dir.is_dir():
+        return 0
+    removed = 0
+    for path in out_dir.glob("*.csv"):
+        path.unlink()
+        removed += 1
+    return removed
+
+
 def run_grid(
     *,
     n_soc: int = N_SOC,
@@ -105,6 +116,9 @@ def run_grid(
     if not out_dir.is_absolute():
         out_dir = REPO_ROOT / out_dir
     if not dry_run:
+        n_old = clear_output_dir(out_dir)
+        if n_old:
+            print(f"已删除旧文件 {n_old} 份  {out_dir}")
         out_dir.mkdir(parents=True, exist_ok=True)
 
     model = None if dry_run else NMC100AhECM()

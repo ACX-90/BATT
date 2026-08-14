@@ -80,6 +80,8 @@ python Src/Sim/nmc100ah_ecm_gen.py --out Data/my_run.csv
 python Src/Sim/nmc100ah_ecm_gen.py --no-noise
 ```
 
+仓库根目录 `gen_common.bat` 等价于第一条。
+
 默认写出 `Data/nmc100ah_ecm_sim.csv`。前几行是 `#` 元数据，pandas 读取时加 `comment="#"`。
 
 主要列：`time_s, mode, i_true_a, i_meas_a, t_true_c, soc_true, u_ocv_v, r0_ohm, r1_ohm, c1_f, tau1_s, u_p_v, u_t_true_v, u_t_meas_v`。
@@ -107,6 +109,10 @@ python Src/Sim/nmc100ah_ecm_gen_grid.py
 python Src/Sim/nmc100ah_ecm_gen_grid.py --n-soc 5 --n-temp 5
 python Src/Sim/nmc100ah_ecm_gen_grid.py --dry-run
 ```
+
+仓库根目录 `gen_grid.bat` 跑的是 `--n-soc 10 --n-temp 10`（100 份）。
+
+正式跑之前会先删掉输出目录里已有的 `*.csv`（含 `index.csv`），避免换档数后旧文件混进训练集。`--dry-run` 不删、不写。
 
 输出在 `Data/grid/`：
 

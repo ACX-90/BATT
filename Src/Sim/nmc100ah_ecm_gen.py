@@ -34,8 +34,8 @@ ENABLE_CUTOFF = True
 NOISE_ENABLE = True
 NOISE_SEED = 20260813
 NOISE_STD = {
-    "voltage_v": 2.0e-3,  # 端电压 2 mV
-    "current_a": 5.0e-2,  # 电流 50 mA
+    "voltage_v": 0.5e-3,  # 端电压 0.5 mV
+    "current_a": 1.0e-2,  # 电流 10 mA
     "temp_c": 5.0e-2,     # 温度 0.05 °C
     "soc": 5.0e-4,        # SOC 0.05 个百分点
 }

@@ -6,6 +6,7 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 
 - `Doc/MLP-ECM物理信息参数估计.md`（方案 A）
 - `Doc/MLP-ECM固定C1方案与对比.md`（方案 B / B+）
+- `Doc/MLP-ECM增量学习方案与问题.md`（续训 ≠ 增量，方案与坑）
 
 请在**仓库根目录**运行。依赖：`numpy`、`torch`（可选 `matplotlib` 做推理图）。
 
@@ -19,6 +20,7 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 | `dataset.py` | 读 `Data/grid/*.csv` |
 | `train.py` | 预热 + 电压训练 |
 | `infer.py` | 单条轨迹推理、可选画图 |
+| `test.py` | 用 `nmc100ah_ecm_sim.csv` 对照电压与 \(R_0,R_1\) |
 
 ## 三种方案
 
@@ -76,6 +78,18 @@ python Src/AI/MLP/infer.py --csv Data/grid/nmc100ah_ecm_s02_t02_soc050_T+20.csv
 推理默认用**最新 epoch**；`--best` 用验证集最好的那份。
 
 输出 `Data/ai_mlp/infer.csv` 和 `Fig/mlp_ecm_infer.png`。
+
+## 测试
+
+默认拿 `Data/nmc100ah_ecm_sim.csv`（先跑 `nmc100ah_ecm_gen.py`）对照测量电压和教师 \(R_0,R_1\)：
+
+```powershell
+python Src/AI/MLP/test.py
+python Src/AI/MLP/test.py --epoch 400
+python Src/AI/MLP/test.py --best --show
+```
+
+默认用**最新 epoch**。四路纵排：电压测量/预测、电压误差、\(R_0\)、\(R_1\)。写出 `Data/ai_mlp/test.csv` 和 `Fig/mlp_ecm_test.png`。
 
 ## 代码里调用
 
