@@ -1,7 +1,7 @@
-# MLP-ECM 增量学习：技术方案与问题
+# 05 MLP-ECM 增量学习：技术方案与问题
 
 > 对象：已训好的灰箱 MLP，\((I,T,\mathrm{SOC})\rightarrow(R_0,R_1)\)，电路与离散化不变  
-> 对照：`Doc/MLP-ECM物理信息参数估计.md`、`Doc/MLP-ECM固定C1方案与对比.md`  
+> 对照：`Doc/03-MLP-ECM物理信息参数估计.md`、`Doc/04-MLP-ECM固定C1方案与对比.md`  
 > 对齐代码：`Src/AI/MLP/train.py` 的 `--resume`、`scaler.json`、`Data/grid/`  
 > 目的：分清「接着训同一批数据」和「来了新轨迹还要保住旧曲面」，列出可做的方案和本仓库会踩的坑  
 > 本文只做分析，不改训练脚本

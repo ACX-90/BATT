@@ -96,7 +96,7 @@ U_t = U_{\mathrm{ocv}}(\mathrm{SOC},T) - I R_0 - U_p
 P = P_ref · f_SOC · f_相变 · f_T · f_I · f_充放
 ```
 
-公式和默认系数见 [`Doc/NMC100Ah_ECM参数规范.md`](Doc/NMC100Ah_ECM参数规范.md)。
+公式和默认系数见 [`Doc/02-NMC100Ah_ECM参数规范.md`](Doc/02-NMC100Ah_ECM参数规范.md)。
 
 ## 模块一览
 
@@ -175,10 +175,10 @@ MLP 输入标准化后的 \([I,\,\mathrm{SOC},\,T]\)，经 softplus 保证参数
 
 | 文档 | 内容 |
 |------|------|
-| [`Doc/NCM电芯ECM参数R0_R1_C1特性.md`](Doc/NCM电芯ECM参数R0_R1_C1特性.md) | \(R_0,R_1,C_1\) 随 SOC / 温度 / 电流的定性规律 |
-| [`Doc/NMC100Ah_ECM参数规范.md`](Doc/NMC100Ah_ECM参数规范.md) | 乘性结构、默认系数、标定建议 |
-| [`Doc/MLP-ECM物理信息参数估计.md`](Doc/MLP-ECM物理信息参数估计.md) | 方案 A：MLP 出三个参数，电压反传 |
-| [`Doc/MLP-ECM固定C1方案与对比.md`](Doc/MLP-ECM固定C1方案与对比.md) | 方案 B / B+：为什么少出 \(C_1\) 更好训 |
-| [`Doc/MLP-ECM增量学习方案与问题.md`](Doc/MLP-ECM增量学习方案与问题.md) | `--resume` 不是增量；回放 / 缩放 / 扩维及本仓库的坑 |
+| [`Doc/01-NCM电芯ECM参数R0_R1_C1特性.md`](Doc/01-NCM电芯ECM参数R0_R1_C1特性.md) | \(R_0,R_1,C_1\) 随 SOC / 温度 / 电流的定性规律 |
+| [`Doc/02-NMC100Ah_ECM参数规范.md`](Doc/02-NMC100Ah_ECM参数规范.md) | 乘性结构、默认系数、标定建议 |
+| [`Doc/03-MLP-ECM物理信息参数估计.md`](Doc/03-MLP-ECM物理信息参数估计.md) | 方案 A：MLP 出三个参数，电压反传 |
+| [`Doc/04-MLP-ECM固定C1方案与对比.md`](Doc/04-MLP-ECM固定C1方案与对比.md) | 方案 B / B+：为什么少出 \(C_1\) 更好训 |
+| [`Doc/05-MLP-ECM增量学习方案与问题.md`](Doc/05-MLP-ECM增量学习方案与问题.md) | `--resume` 不是增量；回放 / 缩放 / 扩维及本仓库的坑 |
 
 子目录 `readme.md` 写各自的命令、列名和配置项。

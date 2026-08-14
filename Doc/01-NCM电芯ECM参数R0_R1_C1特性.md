@@ -1,4 +1,4 @@
-# NCM 电芯 ECM 参数 R0、R1、C1 特性
+# 01 NCM 电芯 ECM 参数 R0、R1、C1 特性
 
 > 对象：三元锂离子电芯（NCM/NMC，含 NCM111 / 523 / 622 / 811 等）  
 > 模型：一阶 Thevenin 等效电路（OCV + R0 + R1∥C1）  

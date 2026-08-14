@@ -4,9 +4,9 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 
 设计见：
 
-- `Doc/MLP-ECM物理信息参数估计.md`（方案 A）
-- `Doc/MLP-ECM固定C1方案与对比.md`（方案 B / B+）
-- `Doc/MLP-ECM增量学习方案与问题.md`（续训 ≠ 增量，方案与坑）
+- `Doc/03-MLP-ECM物理信息参数估计.md`（方案 A）
+- `Doc/04-MLP-ECM固定C1方案与对比.md`（方案 B / B+）
+- `Doc/05-MLP-ECM增量学习方案与问题.md`（续训 ≠ 增量，方案与坑）
 
 请在**仓库根目录**运行。依赖：`numpy`、`torch`（可选 `matplotlib` 做推理图）。
 

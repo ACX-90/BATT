@@ -1,4 +1,4 @@
-# 用 MLP 估测 ECM 参数：设计思路与反向传播
+# 03 用 MLP 估测 ECM 参数：设计思路与反向传播
 
 > 对象：100 Ah NMC，一阶 Thevenin（OCV + \(R_0\) + \(R_1\parallel C_1\)）  
 > 监督信号：只有端电压测量 \(U_t^{\mathrm{meas}}\)，**没有** \(R_0,R_1,C_1\) 标签  
@@ -400,7 +400,7 @@ Src/Sim/nmc100ah_ecm.py          解析映射，作对照与 MLP 预热标签
 Src/Sim/nmc100ah_ecm_gen.py      离散 ECM 与单条 CSV（教师 / 合成数据）
 Src/Sim/nmc100ah_ecm_gen_grid.py 多 SOC×T 轨迹，作训练集
 Data/grid/*.csv                  I, T, SOC, Uocv, Ut_meas
-Doc/NMC100Ah_ECM参数规范.md      电路与因子定义
+Doc/02-NMC100Ah_ECM参数规范.md   电路与因子定义
 ```
 
 训练时 **不要** 用 CSV 里的 `r0_ohm,r1_ohm,c1_f` 当主损失（那是教师自己的参数）。主损失只用 `u_t_meas_v`（或合成数据里的 `u_t_true_v`）。教师参数仅用于预热或事后对照。

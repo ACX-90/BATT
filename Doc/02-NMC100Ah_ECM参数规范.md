@@ -1,7 +1,7 @@
-# 100 Ah NMC 电芯 ECM 参数规范
+# 02 100 Ah NMC 电芯 ECM 参数规范
 
 > 配套代码：`Src/Sim/nmc100ah_ecm_params.py`、`Src/Sim/nmc100ah_ecm.py`、`Src/Sim/nmc100ah_ecm_demo.py`  
-> 特性背景：`Doc/NCM电芯ECM参数R0_R1_C1特性.md`  
+> 特性背景：`Doc/01-NCM电芯ECM参数R0_R1_C1特性.md`  
 > 模型：一阶 Thevenin（OCV + \(R_0\) + \(R_1 \parallel C_1\)）  
 > 映射：\((I,\, T,\, \mathrm{SOC}) \rightarrow (R_0,\, R_1,\, C_1)\)
 
