@@ -1,47 +1,49 @@
 @echo off
 :: =============================================================================
-:: gen_grid.bat  —  按起始 SOC × 温度网格批量生成训练波形
+:: gen_grid.bat  -  SOC x temperature grid for training waveforms
 :: =============================================================================
 ::
-:: 用法
-::   在仓库根目录双击，或命令行执行：
+:: usage
+::   double-click in repo root, or:
 ::     gen_grid.bat
 ::
-:: 做什么
-::   每份沿用 nmc100ah_ecm_gen.py 的 SEQUENCE 和噪声，只改起始 SOC 与温度。
-::   写出 Data/grid/*.csv，供 train_100.bat / train_1000_resume.bat 使用。
+:: what it does
+::   same SEQUENCE and noise as nmc100ah_ecm_gen.py
+::   only start SOC and temperature change per file
+::   writes Data/grid/*.csv for train_100.bat / train_1000_resume.bat
 ::
-:: 本文件实际执行的命令（只改下面这一行）
+:: command actually run  -- edit the python line below
 ::   python .\Src\Sim\nmc100ah_ecm_gen_grid.py --n-soc 10 --n-temp 10
 ::
-:: 命令行参数
-::   --n-soc N         起始 SOC 档数（本文件 10；脚本默认 5）
-::   --n-temp N        温度档数（本文件 10；脚本默认 5）
-::   --out-dir 路径    输出目录（默认 Data/grid）
-::   --seed N          覆盖基础噪声种子；每档再偏置 i*100+j
-::   --no-noise        关闭测量噪声
-::   --dry-run         只打印网格，不删旧文件、不仿真
+:: CLI args
+::   --n-soc N         start-SOC bins  -- this file: 10; py default 5
+::   --n-temp N        temperature bins  -- this file: 10; py default 5
+::   --out-dir PATH    output dir  -- default Data/grid
+::   --seed N          base noise seed; each case offsets by i*100+j
+::   --no-noise        disable meas noise
+::   --dry-run         print grid only; no delete, no sim
 ::
-:: 扫描区间在 Src/Sim/nmc100ah_ecm_gen_grid.py 头部：
-::   SOC_MIN / SOC_MAX     默认 0.10 ~ 0.90（含端点；n=1 取中点）
-::   T_MIN_C / T_MAX_C     默认 -10 ~ 50 °C
+:: scan range: Src/Sim/nmc100ah_ecm_gen_grid.py header
+::   SOC_MIN / SOC_MAX     default 0.10 to 0.90, inclusive; n=1 uses midpoint
+::   T_MIN_C / T_MAX_C     default -10 to 50 C
 ::   SOC_VALUES / T_VALUES_C
-::                         若写成列表则不再按 MIN/MAX 均分，档数以列表为准
+::                         if set as lists, those replace MIN/MAX linspace
 ::   OUTPUT_DIR / FILE_NAME
 ::
-:: 指令序列、噪声、步长
-::   全部从 nmc100ah_ecm_gen.py 导入，改那一处即可两边同步。
+:: SEQUENCE, noise, dt
+::   imported from nmc100ah_ecm_gen.py; edit once, both stay in sync
 ::
-:: 输出（默认 Data/grid/）
-::   nmc100ah_ecm_s{ii}_t{jj}_socXXX_T±YY.csv
-::   index.csv   档位、初值、结束 SOC/电压、是否触发保护、路径
+:: output  -- default Data/grid
+::   nmc100ah_ecm_s{ii}_t{jj}_socXXX_T+YY.csv
+::   index.csv   bin, init, end SOC/V, cutoff flag, path
 ::
-:: 说明
-::   正式跑之前会先删掉输出目录里已有的 *.csv（含 index.csv），
-::   避免换档数后旧文件混进训练集。--dry-run 不删、不写。
-::   本文件是 10×10 = 100 份；改回 5×5 就把两个 10 都改成 5。
-::   低 SOC + 低温可能提前截止，是保护逻辑，不是算挂了。
-::   详见 Src/Sim/readme.md
+:: notes
+::   a real run deletes existing *.csv in the out dir, including index.csv
+::   so leftover files from a different grid size do not enter training
+::   --dry-run does not delete or write
+::   this file is 10x10 = 100 cases; set both 10 to 5 for 5x5
+::   low SOC + low T may trip cutoff; that is protection, not a crash
+::   see Src/Sim/readme.md
 :: =============================================================================
 
 python .\Src\Sim\nmc100ah_ecm_gen_grid.py --n-soc 10 --n-temp 10

@@ -1,29 +1,29 @@
 @echo off
 :: =============================================================================
-:: autogit.bat  —  一键拉取、提交、推送当前仓库
+:: autogit.bat  -  pull, commit, push this repo
 :: =============================================================================
 ::
-:: 用法
-::   在仓库根目录双击，或命令行执行：
+:: usage
+::   double-click in repo root, or:
 ::     autogit.bat
 ::
-:: 本文件实际执行的命令（顺序不要改）
+:: commands actually run  -- keep this order
 ::   git pull
 ::   git add *
 ::   git commit -m "auto update"
 ::   git push
 ::
-:: 各步含义
-::   git pull              先拉远程，减少直接 push 冲突
-::   git add *             暂存当前目录可见文件（不含点文件，如 .gitignore）
-::   git commit -m "..."   提交；提交说明改上面那一行的引号内容
-::   git push              推到当前分支跟踪的远程
+:: steps
+::   git pull              fetch remote first to cut push conflicts
+::   git add *             stage visible files; dotfiles are skipped
+::   git commit -m "..."   commit; edit the quoted message on that line
+::   git push              push the tracked remote branch
 ::
-:: 注意
-::   没有改动时 commit 会失败，后面的 push 不会执行。属正常。
-::   git add * 不会加入点文件 / 点目录。
-::   Data/、Fig/ 已在 .gitignore 里，仿真 CSV 和出图一般不会被提交。
-::   提交说明写死为 auto update，要改内容就编辑 commit 那一行。
+:: notes
+::   if nothing changed, commit fails and push is skipped. that is ok
+::   git add * does not add dotfiles or dot-dirs
+::   Data/ and Fig/ are gitignored; sim CSV and plots usually stay local
+::   commit message is hard-coded "auto update"
 :: =============================================================================
 
 git pull

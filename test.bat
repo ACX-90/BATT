@@ -1,44 +1,45 @@
 @echo off
 :: =============================================================================
-:: test.bat  —  用单条仿真轨迹测试已训 MLP-ECM
+:: test.bat  -  test trained MLP-ECM on one sim trajectory
 :: =============================================================================
 ::
-:: 用法
-::   在仓库根目录双击，或命令行执行：
+:: usage
+::   double-click in repo root, or:
 ::     test.bat
 ::
-:: 前置
-::   1. Data/ai_mlp/ 下已有权重和 scaler.json（先训练）
-::   2. Data/nmc100ah_ecm_sim.csv 已生成（双击 gen_common.bat，
-::      或 python Src/Sim/nmc100ah_ecm_gen.py）
+:: prerequisites
+::   1. weights and scaler.json under Data/ai_mlp  -- train first
+::   2. Data/nmc100ah_ecm_sim.csv exists
+::      run gen_common.bat or: python Src/Sim/nmc100ah_ecm_gen.py
 ::
-:: 本文件实际执行的命令（只改下面这一行）
+:: command actually run  -- edit the python line below
 ::   python Src/AI/MLP/test.py --show
 ::
-:: 参数说明
-::   --show            出图后弹窗（本文件已打开；不要图窗就删掉这个开关）
-::   --no-plot         只算指标、写 CSV，不出图
-::   --epoch N         用指定电压 epoch 的权重，例如 --epoch 400
-::   --ckpt 路径       直接指定权重文件，例如 Data/ai_mlp/best.pt
-::   --best            改用验证集最好的 best.pt（默认是最新 epoch）
-::   --csv 路径        测试用仿真表（默认 Data/nmc100ah_ecm_sim.csv）
-::   --out-dir 路径    找权重 / scaler 的目录（默认 Data/ai_mlp）
-::   --out 路径        写出对照表（默认 Data/ai_mlp/test.csv）
-::   --fig 路径        出图路径（默认 Fig/mlp_ecm_test.png）
-::   --list-ckpts      只列出已保存的 epoch，然后退出
+:: args
+::   --show            pop up the figure  -- on in this file; drop it to skip
+::   --no-plot         metrics and CSV only, no figure
+::   --epoch N         use that voltage-epoch ckpt, e.g. --epoch 400
+::   --ckpt PATH       weight file, e.g. Data/ai_mlp/best.pt
+::   --best            use best.pt instead of the latest epoch
+::   --csv PATH        sim table  -- default Data/nmc100ah_ecm_sim.csv
+::   --out-dir PATH    dir for weights and scaler  -- default Data/ai_mlp
+::   --out PATH        write compare table  -- default Data/ai_mlp/test.csv
+::   --fig PATH        figure path  -- default Fig/mlp_ecm_test.png
+::   --list-ckpts      list saved epochs and exit
 ::
-:: 默认行为
-::   不写 --epoch / --ckpt / --best 时，用最新一个 epoch_XXXXX.pt。
+:: default
+::   with no --epoch, --ckpt or --best: latest epoch_XXXXX.pt
 ::
-:: 输出
-::   控制台：电压 RMSE/MAE/MAX，以及 R0、R1 相对真值的误差
+:: output
+::   console: voltage RMSE, MAE, MAX; R0 and R1 vs teacher
 ::   Data/ai_mlp/test.csv
 ::   Fig/mlp_ecm_test.png
-::     四路纵排：测量/预测电压、电压误差、R0 真值/预测、R1 真值/预测
+::     4 rows: Ut meas/pred, voltage error, R0 true/pred, R1 true/pred
 ::
-:: 说明
-::   这是对照测试，不是训练。输入轨迹应带教师列 r0_ohm、r1_ohm。
-::   详见 Src/AI/MLP/readme.md
+:: notes
+::   evaluation only, no training, weights are not written back
+::   CSV should have teacher columns r0_ohm, r1_ohm
+::   see Src/AI/MLP/readme.md
 :: =============================================================================
 
 python Src/AI/MLP/test.py --show

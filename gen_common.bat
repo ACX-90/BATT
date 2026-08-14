@@ -1,42 +1,43 @@
 @echo off
 :: =============================================================================
-:: gen_common.bat  —  生成单条对照工况（Data/nmc100ah_ecm_sim.csv）
+:: gen_common.bat  -  one reference trajectory: Data/nmc100ah_ecm_sim.csv
 :: =============================================================================
 ::
-:: 用法
-::   在仓库根目录双击，或命令行执行：
+:: usage
+::   double-click in repo root, or:
 ::     gen_common.bat
 ::
-:: 做什么
-::   按 nmc100ah_ecm_gen.py 头部的 SEQUENCE 跑一条时域仿真，
-::   给 test.bat / 出图用。训练网格请用 gen_grid.bat。
+:: what it does
+::   time-domain sim using SEQUENCE in nmc100ah_ecm_gen.py
+::   for test.bat and plots. training grid: use gen_grid.bat
 ::
-:: 本文件实际执行的命令（只改下面这一行）
+:: command actually run  -- edit the python line below
 ::   python Src/Sim/nmc100ah_ecm_gen.py
 ::
-:: 命令行参数
-::   --out 路径        输出 CSV（默认 Data/nmc100ah_ecm_sim.csv）
-::   --seed N          覆盖头部 NOISE_SEED
-::   --no-noise        关闭测量噪声（真值列本来就没有噪声）
+:: CLI args
+::   --out PATH        output CSV  -- default Data/nmc100ah_ecm_sim.csv
+::   --seed N          override NOISE_SEED in the py header
+::   --no-noise        disable meas noise; true columns stay clean
 ::
-:: 工况本身不在 bat 里改，打开 Src/Sim/nmc100ah_ecm_gen.py 头部：
-::   SOC0 / T_AMBIENT_C / U_P0    初始 SOC、温度、极化电压
-::   DT_S                         步长，默认 0.1 s
-::   ENABLE_CUTOFF                碰到电压/SOC 边界则本条指令改静置
+:: profile is NOT in this bat. edit Src/Sim/nmc100ah_ecm_gen.py header:
+::   SOC0 / T_AMBIENT_C / U_P0    initial SOC, temp, polarization
+::   DT_S                         step, default 0.1 s
+::   ENABLE_CUTOFF                rest for rest of cmd if V/SOC hits limit
 ::   NOISE_ENABLE / NOISE_SEED / NOISE_STD
-::   SEQUENCE                     充 / 放 / 静置指令列表
-::     mode          charge | discharge | rest
-::     duration_s    秒（与 duration_steps 二选一）
-::     c_rate        倍率，1.0 = 100 A（与 current_a 二选一）
+::   SEQUENCE                     charge / discharge / rest list
+::     mode          charge or discharge or rest
+::     duration_s    seconds, or duration_steps, not both
+::     c_rate        1.0 = 100 A, or current_a, not both
 ::
-:: 输出
+:: output
 ::   Data/nmc100ah_ecm_sim.csv
-::   前几行是 # 元数据，表头后才是数据。pandas 读时加 comment="#"。
+::   leading # metadata, then header. pandas: comment="#"
 ::
-:: 说明
-::   放电电流为正，充电为负。默认数值是 100 Ah NMC 模板。
-::   网格批量出波用 gen_grid.bat（沿用本文件的 SEQUENCE 和噪声配置）。
-::   详见 Src/Sim/readme.md
+:: notes
+::   discharge current positive, charge negative
+::   defaults are a 100 Ah NMC template, not a commercial cell
+::   grid waveforms: gen_grid.bat, same SEQUENCE and noise
+::   see Src/Sim/readme.md
 :: =============================================================================
 
 python Src/Sim/nmc100ah_ecm_gen.py
