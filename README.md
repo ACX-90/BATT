@@ -1,4 +1,5 @@
 # BATT — 100 Ah NMC 一阶 ECM 与物理信息参数估计
+# Powered by SpaceXAI Grok 4.6
 
 通用 **100 Ah NMC** 电芯的一阶 Thevenin 工具链：解析参数模型、时域仿真、出图，以及用端电压训练 MLP 估 \(R_0,R_1(,C_1)\)。
 
