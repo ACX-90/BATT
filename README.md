@@ -154,6 +154,7 @@ MLP 输入标准化后的 \([I,\,\mathrm{SOC},\,T]\)，经 softplus 保证参数
 | [`train_1000_resume.bat`](train_1000_resume.bat) | 方案 B，从最新权重再训 1000 轮 | `python Src/AI/MLP/train.py --scheme B --epochs 1000 --resume` |
 | [`test.bat`](test.bat) | 最新权重 + `Data/nmc100ah_ecm_sim.csv`，弹窗出对照图 | `python Src/AI/MLP/test.py --show` |
 | [`autogit.bat`](autogit.bat) | `pull` → `add *` → `commit` → `push` | 见文件内四行 git |
+| [`clean.bat`](clean.bat) | 删掉 `.gitignore` 匹配的文件（先确认 Y） | `git clean -fdX` |
 
 常用改法（只动 bat 里那一行 python）：
 
@@ -180,5 +181,6 @@ MLP 输入标准化后的 \([I,\,\mathrm{SOC},\,T]\)，经 softplus 保证参数
 | [`Doc/03-MLP-ECM物理信息参数估计.md`](Doc/03-MLP-ECM物理信息参数估计.md) | 方案 A：MLP 出三个参数，电压反传 |
 | [`Doc/04-MLP-ECM固定C1方案与对比.md`](Doc/04-MLP-ECM固定C1方案与对比.md) | 方案 B / B+：为什么少出 \(C_1\) 更好训 |
 | [`Doc/05-MLP-ECM增量学习方案与问题.md`](Doc/05-MLP-ECM增量学习方案与问题.md) | `--resume` 不是增量；回放 / 缩放 / 扩维及本仓库的坑 |
+| [`Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md`](Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md) | EKF 估 SOC；MLP / ECM / KF 分工；用开环电压误差增量 |
 
 子目录 `readme.md` 写各自的命令、列名和配置项。
