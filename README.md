@@ -6,9 +6,10 @@
 默认数值是模板，用来搭模型和跑通流程，**不是某一款商用电芯的出厂值**。换真实电芯时改参数，不改电路结构。
 
 ```
-(I, T, SOC) ──► 解析 ECM / MLP ──► (R0, R1, C1) ──► 一阶电路 ──► Ut
-                                                     │
-                                      Ut_meas ───────┴──► 电压损失反传（仅 MLP）
+(I, T) ──► 安时 s⁻ ──► MLP ──► (R0, R1) ──► ECM ──► Ût⁻
+                │                              │
+                └──────── EKF(s, Up) ◄── Ut_meas − Ût⁻
+增量只吃开环电压误差 e_ol，不吃滤波后验残差。
 ```
 
 请在**仓库根目录**运行脚本，相对路径 `Data/`、`Doc/`、`Fig/` 才正确。
@@ -20,6 +21,7 @@
 | [`Src/Sim/`](Src/Sim/readme.md) | 参数映射、单条仿真、SOC×温度网格出波 |
 | [`Src/Plot/`](Src/Plot/readme.md) | \(R_0/R_1/C_1\) 曲面与仿真波形 |
 | [`Src/AI/MLP/`](Src/AI/MLP/readme.md) | 物理信息 MLP：电压误差穿过可微 ECM |
+| [`Src/AI/KF/`](Src/AI/KF/readme.md) | EKF 估 SOC，ECM 出端电压，开环误差离线增量 |
 | [`Doc/`](Doc/) | 参数规范、特性说明、MLP 方案推导 |
 | `Data/` | 仿真 CSV、网格数据、训练产物（默认 gitignore） |
 | `Fig/` | 出图 PNG（gitignore） |
@@ -143,6 +145,16 @@ MLP 输入标准化后的 \([I,\,\mathrm{SOC},\,T]\)，经 softplus 保证参数
 
 训练默认从头开始。`--resume` 从最新 epoch 续训，`--epoch N` / `--ckpt` 指定起点，`--fresh` 强制重来。归一化 `scaler.json` 必须与权重配套。
 
+### KF — SOC 滤波与增量
+
+```powershell
+python Src/AI/KF/run.py --selftest
+python Src/AI/KF/run.py --soc-error 0.05 --current-bias 5
+python Src/AI/KF/increment.py --mode replay --new-dir Data/ai_kf/logs --replay-dir Data/grid
+```
+
+EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验端电压。`--resume` 同一网格再训不是增量；增量走 `increment.py`，冻 scaler，损失只用开环 \(e^{ol}\)。
+
 ## 批处理
 
 都在仓库根目录。资源管理器里双击即可（工作目录就是仓库根）。每个文件开头用 `::` 写了用法和参数，**改实际命令那一行就行**，不必先去翻 Python 脚本。
@@ -154,6 +166,8 @@ MLP 输入标准化后的 \([I,\,\mathrm{SOC},\,T]\)，经 softplus 保证参数
 | [`train_100.bat`](train_100.bat) | 方案 B，从头训 100 个电压 epoch | `python Src/AI/MLP/train.py --scheme B --epochs 100` |
 | [`train_1000_resume.bat`](train_1000_resume.bat) | 方案 B，从最新权重再训 1000 轮 | `python Src/AI/MLP/train.py --scheme B --epochs 1000 --resume` |
 | [`test.bat`](test.bat) | 最新权重 + `Data/nmc100ah_ecm_sim.csv`，弹窗出对照图 | `python Src/AI/MLP/test.py --show` |
+| [`kf_run.bat`](kf_run.bat) | EKF 闭环：SOC 初偏 + 电流零偏 | `python Src/AI/KF/run.py --soc-error 0.05 --current-bias 5 --show` |
+| [`kf_increment.bat`](kf_increment.bat) | 开环电压 Replay 增量 | `python Src/AI/KF/increment.py --mode replay ...` |
 | [`autogit.bat`](autogit.bat) | `pull` → `add *` → `commit` → `push` | 见文件内四行 git |
 | [`clean.bat`](clean.bat) | 删掉 `.gitignore` 匹配的文件（先确认 Y） | `git clean -fdX` |
 
@@ -183,5 +197,7 @@ MLP 输入标准化后的 \([I,\,\mathrm{SOC},\,T]\)，经 softplus 保证参数
 | [`Doc/04-MLP-ECM固定C1方案与对比.md`](Doc/04-MLP-ECM固定C1方案与对比.md) | 方案 B / B+：为什么少出 \(C_1\) 更好训 |
 | [`Doc/05-MLP-ECM增量学习方案与问题.md`](Doc/05-MLP-ECM增量学习方案与问题.md) | `--resume` 不是增量；回放 / 缩放 / 扩维及本仓库的坑 |
 | [`Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md`](Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md) | EKF 估 SOC；MLP / ECM / KF 分工；用开环电压误差增量 |
+| [`Doc/07-英飞凌残差头增量学习方案评估.md`](Doc/07-英飞凌残差头增量学习方案评估.md) | 3×8×2 残差头；每芯 18 个数；10 mV / 0.1 s 反传 |
+| [`Doc/08-TC4D7-PPU与800V系统融合评估.md`](Doc/08-TC4D7-PPU与800V系统融合评估.md) | TC4D7+PPU、800 V 包上按 demo 评估，再谈优化 |
 
 子目录 `readme.md` 写各自的命令、列名和配置项。

@@ -8,6 +8,10 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 - `Doc/04-MLP-ECM固定C1方案与对比.md`（方案 B / B+）
 - `Doc/05-MLP-ECM增量学习方案与问题.md`（续训 ≠ 增量，方案与坑）
 - `Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md`（EKF 估 SOC，开环电压误差做增量）
+- `Doc/07-英飞凌残差头增量学习方案评估.md`（每芯 \(\Delta R\) 头，对照缩放 / Replay）
+- `Doc/08-TC4D7-PPU与800V系统融合评估.md`（芯片 + 800 V 包 + demo / 优化）
+
+闭环滤波和离线增量在 [`Src/AI/KF/`](../KF/readme.md)，不要在本目录的 `test.py` 里更新权重。
 
 请在**仓库根目录**运行。依赖：`numpy`、`torch`（可选 `matplotlib` 做推理图）。
 

@@ -16,6 +16,20 @@ Data/ai_mlp/ckpts/**
 !Data/ai_mlp/ckpts/latest.json
 Data/ai_mlp/ckpts/epoch_*.pt
 
+# Data/ai_kf：滤波日志与增量权重；epoch 大文件不传
+!Data/ai_kf/
+Data/ai_kf/**
+!Data/ai_kf/*.json
+!Data/ai_kf/incr/
+Data/ai_kf/incr/**
+!Data/ai_kf/incr/*.json
+!Data/ai_kf/incr/*.pt
+Data/ai_kf/incr/epoch_*.pt
+!Data/ai_kf/incr/ckpts/
+Data/ai_kf/incr/ckpts/**
+!Data/ai_kf/incr/ckpts/latest.json
+Data/ai_kf/incr/ckpts/epoch_*.pt
+
 # Python 缓存
 __pycache__/
 *.pyc

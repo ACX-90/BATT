@@ -1,0 +1,29 @@
+{
+  "ckpt": "C:\\Users\\26354\\Desktop\\workspace\\Battery\\BATT\\Data\\ai_mlp\\ckpts\\epoch_00556.pt",
+  "csv": "C:\\Users\\26354\\Desktop\\workspace\\Battery\\BATT\\Data\\nmc100ah_ecm_sim.csv",
+  "stats": {
+    "e_ol_rmse_mV": 24.56996341186736,
+    "e_pri_rmse_mV": 0.8260499111728744,
+    "e_post_rmse_mV": 0.12336399721543878,
+    "nis_median": 0.13263574560936126,
+    "nis_mean": 0.29170563386093046,
+    "s_end_ah": 0.7011107910012324,
+    "s_end_post": 0.6681666283485862,
+    "s_ah_rmse": 0.04576128542357896,
+    "s_post_rmse": 0.009696519648031057,
+    "s_end_true": 0.65972222,
+    "s_end_ah_err": 0.04138857100123239,
+    "s_end_post_err": 0.008444408348586174
+  },
+  "gate": {
+    "nis_median": 0.13263574560936126,
+    "nis_max_run": 0.0,
+    "e_ol_rms_mV": 24.56996341186736,
+    "has_edge": 1.0,
+    "rest_s": 0.0,
+    "t_min": 24.808589,
+    "t_max": 25.191017,
+    "t_ok": 1.0
+  },
+  "accepted": true
+}
