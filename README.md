@@ -199,6 +199,6 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md`](Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md) | EKF 估 SOC；MLP / ECM / KF 分工；用开环电压误差增量 |
 | [`Doc/07-英飞凌残差头增量学习方案评估.md`](Doc/07-英飞凌残差头增量学习方案评估.md) | 3×8×2 残差头；每芯 18 个数；10 mV / 0.1 s 反传 |
 | [`Doc/08-TC4D7-PPU与800V系统融合评估.md`](Doc/08-TC4D7-PPU与800V系统融合评估.md) | TC4D7+PPU、800 V 包上按 demo 评估，再谈优化 |
-| [`Doc/09-非MLP结构GRU-LSTM评估.md`](Doc/09-非MLP结构GRU-LSTM评估.md) | GRU 不宜换 MLP；单点待久忘曲面是权重干涉，不是缺隐状态 |
+| [`Doc/09-非MLP结构GRU-LSTM评估.md`](Doc/09-非MLP结构GRU-LSTM评估.md) | 循环核不宜换点式头；滑窗多拍残差是训练协议 |
 
 子目录 `readme.md` 写各自的命令、列名和配置项。

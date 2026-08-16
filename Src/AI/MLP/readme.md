@@ -10,7 +10,7 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 - `Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md`（EKF 估 SOC，开环电压误差做增量）
 - `Doc/07-英飞凌残差头增量学习方案评估.md`（每芯 \(\Delta R\) 头，对照缩放 / Replay）
 - `Doc/08-TC4D7-PPU与800V系统融合评估.md`（芯片 + 800 V 包 + demo / 优化）
-- `Doc/09-非MLP结构GRU-LSTM评估.md`（GRU 不宜换 MLP；单点待久忘曲面是权重干涉）
+- `Doc/09-非MLP结构GRU-LSTM评估.md`（循环核不宜换点式头；滑窗多拍残差是训练协议）
 
 闭环滤波和离线增量在 [`Src/AI/KF/`](../KF/readme.md)，不要在本目录的 `test.py` 里更新权重。
 
