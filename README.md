@@ -151,6 +151,7 @@ MLP 输入标准化后的 \([I,\,\mathrm{SOC},\,T]\)，经 softplus 保证参数
 python Src/AI/KF/run.py --selftest
 python Src/AI/KF/run.py --soc-error 0.05 --current-bias 5
 python Src/AI/KF/increment.py --mode replay --new-dir Data/ai_kf/logs --replay-dir Data/grid
+python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15
 ```
 
 EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验端电压。`--resume` 同一网格再训不是增量；增量走 `increment.py`，冻 scaler，损失只用开环 \(e^{ol}\)。
@@ -168,6 +169,7 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`test.bat`](test.bat) | 最新权重 + `Data/nmc100ah_ecm_sim.csv`，弹窗出对照图 | `python Src/AI/MLP/test.py --show` |
 | [`kf_run.bat`](kf_run.bat) | EKF 闭环：SOC 初偏 + 电流零偏 | `python Src/AI/KF/run.py --soc-error 0.05 --current-bias 5 --show` |
 | [`kf_increment.bat`](kf_increment.bat) | 开环电压 Replay 增量 | `python Src/AI/KF/increment.py --mode replay ...` |
+| [`kf_compare.bat`](kf_compare.bat) | 电阻 ×1.15 四档对照 | `python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15` |
 | [`autogit.bat`](autogit.bat) | `pull` → `add *` → `commit` → `push` | 见文件内四行 git |
 | [`clean.bat`](clean.bat) | 删掉 `.gitignore` 匹配的文件（先确认 Y） | `git clean -fdX` |
 
@@ -200,5 +202,6 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Doc/07-英飞凌残差头增量学习方案评估.md`](Doc/07-英飞凌残差头增量学习方案评估.md) | 3×8×2 残差头；每芯 18 个数；10 mV / 0.1 s 反传 |
 | [`Doc/08-TC4D7-PPU与800V系统融合评估.md`](Doc/08-TC4D7-PPU与800V系统融合评估.md) | TC4D7+PPU、800 V 包上按 demo 评估，再谈优化 |
 | [`Doc/09-非MLP结构GRU-LSTM评估.md`](Doc/09-非MLP结构GRU-LSTM评估.md) | 循环核不宜换点式头；滑窗多拍残差是训练协议 |
+| [`Doc/10-合成增量对照实验.md`](Doc/10-合成增量对照实验.md) | 电阻 ×1.15 四档对照：缩放是正途，旧集变差是缺维 |
 
 子目录 `readme.md` 写各自的命令、列名和配置项。

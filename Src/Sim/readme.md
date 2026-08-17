@@ -108,7 +108,10 @@ T_VALUES_C = [-10, 25, 45]
 python Src/Sim/nmc100ah_ecm_gen_grid.py
 python Src/Sim/nmc100ah_ecm_gen_grid.py --n-soc 5 --n-temp 5
 python Src/Sim/nmc100ah_ecm_gen_grid.py --dry-run
+python Src/Sim/nmc100ah_ecm_gen_grid.py --out-dir Data/soh_k115 --r0-scale 1.15 --r1-scale 1.15
 ```
+
+`--r0-scale` / `--r1-scale` 把解析 \(R\) 整张乘常数后再仿真，用来造换对象 / 假老化。必须换 `--out-dir`，不要写回 `Data/grid/`。
 
 仓库根目录 `gen_grid.bat` 跑的是 `--n-soc 10 --n-temp 10`（100 份）。
 

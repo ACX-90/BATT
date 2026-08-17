@@ -39,7 +39,8 @@
 | `filter.py` | 闭环滤波 + 开环对照 |
 | `gate.py` | 增量门控 |
 | `run.py` | 单条轨迹闭环 |
-| `increment.py` | 离线增量：Replay / 缩放 / 只微调 |
+| `increment.py` | 离线增量：Replay / 缩放 / 只微调 / 合集重训 |
+| `compare.py` | 四档对照：冻结 / 重训 / Replay / 微调 / 缩放 |
 
 ## 闭环滤波
 
@@ -80,6 +81,16 @@ python Src/AI/KF/increment.py --eval-only --new-dir Data/grid --new-glob *T+50.c
 | `replay`（默认） | 新年份 + 旧网格回放混批，一期首选 |
 | `scale` | 冻 MLP，只学 \(k_0,k_1\)，适合同一只电芯涨阻 |
 | `finetune` | 只扫新数据，旧温区容易忘 |
+| `retrain` | 旧+新合集，从旧权重接着训（冻 scaler）。对照上界，不是增量 |
+
+电阻整张 ×1.15 冒充老化，一次跑四档（外加冻结基线）：
+
+```powershell
+python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15 --epochs 10
+python Src/AI/KF/compare.py --smoke
+```
+
+`--make-new` 把缩放网格写到 `--new-dir`（默认 `Data/soh_k115/`），**不碰** `Data/grid/`。结果在 `Data/ai_kf/compare/compare.md`。读数见 [`Doc/10-合成增量对照实验.md`](../../Doc/10-合成增量对照实验.md)。整体涨阻时 `scale` 不该明显输给 `retrain`；`finetune` 旧集变差是预期失败对照。
 
 权重写到 `Data/ai_kf/incr/`，**不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 

@@ -376,4 +376,29 @@ def _normalized_direction(
     return raw / ref
 
 
-__all__ = ["NMC100AhECM", "ECMResult"]
+class ScaledNMC100AhECM:
+    """把 evaluate 的 R0/R1/C1 乘上常数，用来造「假老化 / 换对象」网格。
+
+    不改乘性形状。仿真 `simulate` 只调 evaluate 和 params.cell。
+    """
+
+    def __init__(
+        self,
+        inner: NMC100AhECM | None = None,
+        *,
+        r0_scale: float = 1.0,
+        r1_scale: float = 1.0,
+        c1_scale: float = 1.0,
+    ) -> None:
+        self.inner = inner if inner is not None else NMC100AhECM()
+        self.params = self.inner.params
+        self.r0_scale = float(r0_scale)
+        self.r1_scale = float(r1_scale)
+        self.c1_scale = float(c1_scale)
+
+    def evaluate(self, *args, **kwargs):
+        r0, r1, c1 = self.inner.evaluate(*args, **kwargs)
+        return r0 * self.r0_scale, r1 * self.r1_scale, c1 * self.c1_scale
+
+
+__all__ = ["NMC100AhECM", "ECMResult", "ScaledNMC100AhECM"]

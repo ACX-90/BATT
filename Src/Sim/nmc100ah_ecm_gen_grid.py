@@ -55,7 +55,7 @@ SIM_DIR = Path(__file__).resolve().parent
 if str(SIM_DIR) not in sys.path:
     sys.path.insert(0, str(SIM_DIR))
 
-from nmc100ah_ecm import NMC100AhECM  # noqa: E402
+from nmc100ah_ecm import NMC100AhECM, ScaledNMC100AhECM  # noqa: E402
 from nmc100ah_ecm_gen import (  # noqa: E402
     DT_S,
     ENABLE_CUTOFF,
@@ -109,6 +109,9 @@ def run_grid(
     noise_enable: bool = NOISE_ENABLE,
     noise_seed: int = NOISE_SEED,
     dry_run: bool = False,
+    r0_scale: float = 1.0,
+    r1_scale: float = 1.0,
+    c1_scale: float = 1.0,
 ) -> list[dict]:
     soc_axis, t_axis = build_grid(n_soc, n_temp)
     n_soc, n_temp = int(soc_axis.size), int(t_axis.size)
@@ -121,12 +124,19 @@ def run_grid(
             print(f"已删除旧文件 {n_old} 份  {out_dir}")
         out_dir.mkdir(parents=True, exist_ok=True)
 
-    model = None if dry_run else NMC100AhECM()
+    if dry_run:
+        model = None
+    elif r0_scale == 1.0 and r1_scale == 1.0 and c1_scale == 1.0:
+        model = NMC100AhECM()
+    else:
+        model = ScaledNMC100AhECM(r0_scale=r0_scale, r1_scale=r1_scale, c1_scale=c1_scale)
     rows: list[dict] = []
 
     print(f"网格 {n_soc}×{n_temp} = {n_soc * n_temp} 份")
     print("SOC : " + ", ".join(f"{s:.3f}" for s in soc_axis))
     print("T   : " + ", ".join(f"{t:+.1f} °C" for t in t_axis))
+    if r0_scale != 1.0 or r1_scale != 1.0 or c1_scale != 1.0:
+        print(f"电阻缩放  R0×{r0_scale:g}  R1×{r1_scale:g}  C1×{c1_scale:g}")
     if dry_run:
         print("dry-run，不写文件")
 
@@ -134,7 +144,10 @@ def run_grid(
     for i, soc0 in enumerate(soc_axis):
         for j, t_c in enumerate(t_axis):
             fname = case_name(i, j, float(soc0), float(t_c))
-            rel = Path(OUTPUT_DIR if not Path(output_dir).is_absolute() else out_dir) / fname
+            try:
+                rel = (out_dir.relative_to(REPO_ROOT) / fname)
+            except ValueError:
+                rel = out_dir / fname
             seed = int(noise_seed) + i * 100 + j
             rec = {
                 "idx": idx,
@@ -183,6 +196,9 @@ def run_grid(
                     f"# grid_j_temp={j}",
                     f"# grid_n_soc={n_soc}",
                     f"# grid_n_temp={n_temp}",
+                    f"# r0_scale={r0_scale}",
+                    f"# r1_scale={r1_scale}",
+                    f"# c1_scale={c1_scale}",
                 ],
             )
             rec.update(
@@ -239,6 +255,9 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=None, help="覆盖噪声种子")
     parser.add_argument("--no-noise", action="store_true", help="关闭噪声")
     parser.add_argument("--dry-run", action="store_true", help="只打印网格，不仿真")
+    parser.add_argument("--r0-scale", type=float, default=1.0, help="整张 R0 乘子（假老化 / 换对象）")
+    parser.add_argument("--r1-scale", type=float, default=1.0, help="整张 R1 乘子")
+    parser.add_argument("--c1-scale", type=float, default=1.0, help="整张 C1 乘子")
     args = parser.parse_args()
 
     run_grid(
@@ -248,6 +267,9 @@ def main() -> None:
         noise_enable=NOISE_ENABLE and not args.no_noise,
         noise_seed=NOISE_SEED if args.seed is None else args.seed,
         dry_run=args.dry_run,
+        r0_scale=args.r0_scale,
+        r1_scale=args.r1_scale,
+        c1_scale=args.c1_scale,
     )
 
 

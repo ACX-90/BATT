@@ -5,6 +5,8 @@
 
     python Src/AI/KF/increment.py --mode replay --new-dir Data/ai_kf/logs --replay-dir Data/grid
     python Src/AI/KF/increment.py --mode scale --new-dir Data/ai_kf/logs
+    python Src/AI/KF/increment.py --mode retrain --new-dir Data/soh_k115 --replay-dir Data/grid
+    python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15
 """
 
 from __future__ import annotations
@@ -288,6 +290,10 @@ def run_increment(args: argparse.Namespace) -> Path:
         cfg.batch_size = args.batch_size
     cfg.device = str(device)
 
+    if getattr(args, "from_scratch", False):
+        model = ParamMLP(cfg)
+        print("合集重训：新建网络，冻旧 scaler，不加载权重")
+
     new_seq = load_incr_sequences(
         _resolve(args.new_dir),
         pattern=args.new_glob,
@@ -295,33 +301,49 @@ def run_increment(args: argparse.Namespace) -> Path:
         weight=1.0,
         style=args.new_style,
     )
-    replay_seq: list[dict] = []
-    if args.mode != "scale" and args.replay_dir:
-        replay_seq = load_incr_sequences(
+    train_old_seq: list[dict] = []
+    if args.mode in {"replay", "retrain"} and args.replay_dir:
+        train_old_seq = load_incr_sequences(
             _resolve(args.replay_dir),
             pattern=args.replay_glob,
             use_true_inputs=True,
             weight=args.beta,
             style="grid",
         )
-        replay_seq = subsample(replay_seq, args.replay_n, args.seed)
+        if args.mode == "replay":
+            train_old_seq = subsample(train_old_seq, args.replay_n, args.seed)
+
+    eval_old_dir = getattr(args, "eval_old_dir", None) or (
+        args.replay_dir if args.replay_dir else ""
+    )
+    eval_old_seq: list[dict] = []
+    if eval_old_dir:
+        eval_old_seq = load_incr_sequences(
+            _resolve(eval_old_dir),
+            pattern=args.replay_glob,
+            use_true_inputs=True,
+            weight=1.0,
+            style="grid",
+        )
 
     new_train, new_val = split_sequences(new_seq, args.val_ratio, args.seed)
-    old_train, old_val = split_sequences(replay_seq, args.val_ratio, args.seed + 1) if replay_seq else ([], [])
+    old_train, _old_val_unused = (
+        split_sequences(train_old_seq, args.val_ratio, args.seed + 1) if train_old_seq else ([], [])
+    )
     train_seq = new_train + old_train
 
     print(
         f"增量 mode={args.mode}  ckpt={ckpt.name}  "
         f"new={len(new_seq)} (train {len(new_train)} / val {len(new_val)})  "
-        f"replay={len(replay_seq)}  scaler 已冻结"
+        f"train_old={len(train_old_seq)}  eval_old={len(eval_old_seq)}  scaler 已冻结"
     )
     r0_b, r1_b = ref_params(model, scaler)
     print(f"旧参考点 (50%, 25°C, 1C)  R0={r0_b*1e3:.4f} mΩ  R1={r1_b*1e3:.4f} mΩ")
 
     new_val_loader = _make_loader(new_val or new_seq, scaler, cfg.batch_size, False)
-    old_val_loader = _make_loader(old_val or replay_seq, scaler, cfg.batch_size, False)
+    old_val_loader = _make_loader(eval_old_seq, scaler, cfg.batch_size, False)
     train_loader = _make_loader(train_seq, scaler, cfg.batch_size, True)
-    if train_loader is None:
+    if train_loader is None and not args.eval_only:
         raise RuntimeError("没有可训轨迹")
 
     if args.mode == "scale":
@@ -329,7 +351,11 @@ def run_increment(args: argparse.Namespace) -> Path:
         opt = torch.optim.Adam([model.log_k0, model.log_k1], lr=args.lr)
     else:
         model = model.to(device)
-        opt = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=cfg.weight_decay)
+        opt = torch.optim.Adam(
+            [p for p in model.parameters() if p.requires_grad],
+            lr=args.lr,
+            weight_decay=cfg.weight_decay,
+        )
 
     def _eval_pair() -> tuple[dict[str, float], dict[str, float]]:
         new_s = evaluate(model, new_val_loader, cfg, device) if new_val_loader else {}
@@ -341,7 +367,38 @@ def run_increment(args: argparse.Namespace) -> Path:
         print(f"增量前  新轨迹 RMSE={new0['rmse_v']*1e3:.2f} mV")
     if old0:
         print(f"增量前  旧回放 RMSE={old0['rmse_v']*1e3:.2f} mV")
+
+    def _pack_meta(
+        r0_a: float,
+        r1_a: float,
+        new_s: dict[str, float],
+        old_s: dict[str, float],
+    ) -> dict:
+        meta = {
+            "mode": args.mode,
+            "source_ckpt": str(ckpt),
+            "new_dir": args.new_dir,
+            "replay_dir": args.replay_dir,
+            "eval_old_dir": eval_old_dir,
+            "beta": args.beta,
+            "epochs": 0 if args.eval_only else args.epochs,
+            "ref_before_mohm": [r0_b * 1e3, r1_b * 1e3],
+            "ref_after_mohm": [r0_a * 1e3, r1_a * 1e3],
+            "new_rmse_before": new0.get("rmse_v"),
+            "old_rmse_before": old0.get("rmse_v"),
+            "new_rmse_after": new_s.get("rmse_v"),
+            "old_rmse_after": old_s.get("rmse_v"),
+        }
+        if isinstance(model, ScaleAdapter):
+            meta["k0"] = model.k0
+            meta["k1"] = model.k1
+        return meta
+
     if args.eval_only:
+        meta = _pack_meta(r0_b, r1_b, new0, old0)
+        (out_dir / "incr.json").write_text(
+            json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
         return out_dir
 
     history = [{"phase": "before", "new": new0, "old": old0}]
@@ -418,15 +475,8 @@ def run_increment(args: argparse.Namespace) -> Path:
     scaler.save(out_dir / "scaler.json")
     cfg.to_json(out_dir / "config.json")
     (out_dir / "history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
-    meta = {
-        "mode": args.mode,
-        "source_ckpt": str(ckpt),
-        "new_dir": args.new_dir,
-        "replay_dir": args.replay_dir,
-        "beta": args.beta,
-        "ref_before_mohm": [r0_b * 1e3, r1_b * 1e3],
-        "ref_after_mohm": [r0_a * 1e3, r1_a * 1e3],
-    }
+    last_new, last_old = _eval_pair()
+    meta = _pack_meta(r0_a, r1_a, last_new or new0, last_old or old0)
     if isinstance(model, ScaleAdapter):
         meta["k0"] = model.k0
         meta["k1"] = model.k1
@@ -437,7 +487,7 @@ def run_increment(args: argparse.Namespace) -> Path:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MLP-ECM 离线增量（开环电压，冻 scaler）")
-    p.add_argument("--mode", default="replay", choices=["replay", "scale", "finetune"])
+    p.add_argument("--mode", default="replay", choices=["replay", "scale", "finetune", "retrain"])
     p.add_argument("--mlp-dir", default="Data/ai_mlp")
     p.add_argument("--out-dir", default="Data/ai_kf/incr")
     p.add_argument("--ckpt", default=None)
@@ -459,16 +509,32 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--device", default=None)
     p.add_argument("--use-true-inputs", action="store_true")
     p.add_argument("--eval-only", action="store_true")
+    p.add_argument(
+        "--eval-old-dir",
+        default=None,
+        help="验收旧区域目录；默认用 --replay-dir（finetune/scale 也建议显式传入）",
+    )
+    p.add_argument(
+        "--from-scratch",
+        action="store_true",
+        help="合集重训时新建网络（仍冻旧 scaler），不加载 mlp-dir 权重",
+    )
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     if args.mode == "finetune":
-        args.replay_dir = ""
         args.replay_n = 0
+        if not args.eval_old_dir:
+            args.eval_old_dir = args.replay_dir or "Data/grid"
+        args.replay_dir = ""
     if args.mode == "scale":
-        args.replay_dir = args.replay_dir if args.replay_dir else ""
+        if not args.eval_old_dir:
+            args.eval_old_dir = args.replay_dir or "Data/grid"
+        args.replay_dir = ""
+    if args.mode == "retrain" and not args.replay_dir:
+        args.replay_dir = "Data/grid"
     run_increment(args)
 
 
