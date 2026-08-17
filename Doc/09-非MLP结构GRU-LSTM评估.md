@@ -1,4 +1,5 @@
 # 09 非 MLP 结构评估：GRU / LSTM 及其它时序网络
+Powered by SpaceXAI Grok 4.6
 
 > 对象：现有灰箱里「\((I,s,T)\rightarrow(R_0,R_1)\)」这一块，现在是点式 MLP  
 > 对照：`Doc/03` 电压反传、`Doc/04` 方案 B、`Doc/05` 增量、`Doc/06` EKF 分工、`Doc/07` 残差头  

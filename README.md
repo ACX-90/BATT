@@ -1,5 +1,5 @@
 # BATT — 100 Ah NMC 一阶 ECM 与物理信息参数估计
-# Powered by SpaceXAI Grok 4.6
+Powered by SpaceXAI Grok 4.6
 
 通用 **100 Ah NMC** 电芯的一阶 Thevenin 工具链：解析参数模型、时域仿真、出图，以及用端电压训练 MLP 估 \(R_0,R_1(,C_1)\)。
 
@@ -191,10 +191,10 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 
 | 文档 | 内容 |
 |------|------|
-| [`Doc/01-NCM电芯ECM参数R0_R1_C1特性.md`](Doc/01-NCM电芯ECM参数R0_R1_C1特性.md) | \(R_0,R_1,C_1\) 随 SOC / 温度 / 电流的定性规律 |
-| [`Doc/02-NMC100Ah_ECM参数规范.md`](Doc/02-NMC100Ah_ECM参数规范.md) | 乘性结构、默认系数、标定建议 |
-| [`Doc/03-MLP-ECM物理信息参数估计.md`](Doc/03-MLP-ECM物理信息参数估计.md) | 方案 A：MLP 出三个参数，电压反传 |
-| [`Doc/04-MLP-ECM固定C1方案与对比.md`](Doc/04-MLP-ECM固定C1方案与对比.md) | 方案 B / B+：为什么少出 \(C_1\) 更好训 |
+| [`Doc/01-NCM电芯ECM参数R0_R1_C1特性.md`](Doc/01-NCM电芯ECM参数R0_R1_C1特性.md) | \(R_0,R_1,C_1\) 特性；§7 二阶 RC，§8 更高阶 |
+| [`Doc/02-NMC100Ah_ECM参数规范.md`](Doc/02-NMC100Ah_ECM参数规范.md) | 乘性结构、默认系数；§11 为 100 Ah 的 2RC 估算 |
+| [`Doc/03-MLP-ECM物理信息参数估计.md`](Doc/03-MLP-ECM物理信息参数估计.md) | 方案 A：电压反传；§11 阶次不足时误差落到哪 |
+| [`Doc/04-MLP-ECM固定C1方案与对比.md`](Doc/04-MLP-ECM固定C1方案与对比.md) | 方案 B / B+；§10 为 1RC BMS 对 2RC / 更高阶的误差预算 |
 | [`Doc/05-MLP-ECM增量学习方案与问题.md`](Doc/05-MLP-ECM增量学习方案与问题.md) | `--resume` 不是增量；回放 / 缩放 / 扩维及本仓库的坑 |
 | [`Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md`](Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md) | EKF 估 SOC；MLP / ECM / KF 分工；用开环电压误差增量 |
 | [`Doc/07-英飞凌残差头增量学习方案评估.md`](Doc/07-英飞凌残差头增量学习方案评估.md) | 3×8×2 残差头；每芯 18 个数；10 mV / 0.1 s 反传 |

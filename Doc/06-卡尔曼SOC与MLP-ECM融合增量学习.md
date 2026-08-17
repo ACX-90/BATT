@@ -1,4 +1,5 @@
 # 06 卡尔曼 SOC 估计、MLP–ECM 融合，以及用电压误差做增量学习
+Powered by SpaceXAI Grok 4.6
 
 > 对象：一阶 Thevenin（OCV + \(R_0\) + \(R_1\parallel C_1\)），放电电流为正，\(\Delta t=0.1\,\mathrm{s}\)  
 > 对照：`Doc/03-MLP-ECM物理信息参数估计.md`、`Doc/04-MLP-ECM固定C1方案与对比.md`、`Doc/05-MLP-ECM增量学习方案与问题.md`  

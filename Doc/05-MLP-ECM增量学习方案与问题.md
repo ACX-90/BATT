@@ -1,4 +1,5 @@
 # 05 MLP-ECM 增量学习：技术方案与问题
+Powered by SpaceXAI Grok 4.6
 
 > 对象：已训好的灰箱 MLP，\((I,T,\mathrm{SOC})\rightarrow(R_0,R_1)\)，电路与离散化不变  
 > 对照：`Doc/03-MLP-ECM物理信息参数估计.md`、`Doc/04-MLP-ECM固定C1方案与对比.md`  
