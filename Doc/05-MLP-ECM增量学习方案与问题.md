@@ -186,20 +186,31 @@ x=[I,\,s,\,T,\,q],\qquad q=\mathrm{SOH}\ \text{或循环周次}
 
 ### 5.1 `scaler.json` 必须冻住
 
-输入是
+`scaler.json` 不是电阻缩放，也不是 \(k_0,k_1\)。它只保存舰队第一次训练时输入 \((I,s,T)\) 的均值和标准差，把物理量映到 MLP 看到的坐标：
 
 \[
-\tilde x = (x-\mu)/\sigma
+\tilde x = (x-\mu)/\sigma,\qquad
+\mu,\sigma\in\mathbb{R}^3
 \]
 
-\(\mu,\sigma\) 写在第一次训练的 `scaler.json` 里。权重是在这套坐标里学的。增量时若对新年份重算均值方差：
+推理是
+
+\[
+(I,s,T)\;\xrightarrow{\mathrm{scaler}}\;\tilde x\;\xrightarrow{\mathrm{MLP}}\;(R_0,R_1)\;\xrightarrow{k_0,k_1}\;(k_0 R_0,\,k_1 R_1)
+\]
+
+（没有缩放头时最后一截是 \(k\equiv 1\)。）scaler 管输入；\(k\) 管输出幅度（§3.5）；二者不要混。
+
+权重是在这套 \(\tilde x\) 里学的。增量时若对新年份重算均值方差：
 
 - 旧权重看到的 \(\tilde I,\tilde s,\tilde T\) 全部错位
 - 看起来 loss 先炸再「重新学会」，其实是把旧曲面扔掉
 
-规则：增量沿用旧 scaler。新年份若超出旧 \(\mu\pm 4\sigma\)（例如第一次最高 35 °C，后来来了 50 °C），应**声明这是扩覆盖**，要么把该维的 \(\sigma\) 人工放大并接受旧权重在该维上的轻微错位，要么走 3.1 重训。不要静默 `fit_scaler`。
+规则：增量沿用旧 scaler。`increment.py` 会把同一份文件拷到对照目录，不是重新 `fit_scaler`。新年份若超出旧 \(\mu\pm 4\sigma\)（例如第一次最高 35 °C，后来来了 50 °C），应**声明这是扩覆盖**，要么把该维的 \(\sigma\) 人工放大并接受旧权重在该维上的轻微错位，要么走 3.1 重训。不要静默 `fit_scaler`。
 
-现有 `train.py` 续训已经坚持读旧 scaler，这一点是对的。换 `data-dir` 微调时不要顺手删 `scaler.json`。
+现有 `train.py` 续训已经坚持读旧 scaler，这一点是对的。换 `data-dir` 微调时不要顺手删 `scaler.json`。缩放档冻 scaler **并且**冻 MLP 权重，只更新 \(k\)；其它增量档只冻 scaler，网可以动。
+
+英飞凌 demo 的输入不是这份 z-score，而是写死的倍率 / SOC 0–1 / 温度盒子，见 `Doc/07` §1.1。冻的理由相同（坐标系不能改），公式不能混用。
 
 ### 5.2 现场没有教师 \(R_0,R_1\)
 
