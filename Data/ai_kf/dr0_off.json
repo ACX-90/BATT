@@ -1,0 +1,29 @@
+{
+  "ckpt": "C:\\Users\\pyx private\\Desktop\\BATT\\Data\\ai_mlp\\best.pt",
+  "csv": "C:\\Users\\pyx private\\Desktop\\BATT\\Data\\nmc100ah_ecm_sim.csv",
+  "stats": {
+    "e_ol_rmse_mV": 10.167786368542771,
+    "e_pri_rmse_mV": 0.9494862116579641,
+    "e_post_rmse_mV": 0.1629101494289661,
+    "nis_median": 0.13470610913334696,
+    "nis_mean": 0.6172847640497633,
+    "s_end_ah": 0.6597219021123429,
+    "s_end_post": 0.6644522349059988,
+    "s_ah_rmse": 1.6081423621143113e-07,
+    "s_post_rmse": 0.007293141680336766,
+    "s_end_true": 0.65972222,
+    "s_end_ah_err": -3.17887657086402e-07,
+    "s_end_post_err": 0.004730014905998781
+  },
+  "gate": {
+    "nis_median": 0.13470610913334696,
+    "nis_max_run": 1.0,
+    "e_ol_rms_mV": 10.167786368542771,
+    "has_edge": 1.0,
+    "rest_s": 120.0,
+    "t_min": 24.808589,
+    "t_max": 25.191017,
+    "t_ok": 1.0
+  },
+  "accepted": true
+}

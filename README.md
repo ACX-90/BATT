@@ -173,6 +173,8 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Script/kf_compare.bat`](Script/kf_compare.bat) | 电阻 ×1.15 四档对照 | `python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15` |
 | [`Script/kf_hole.bat`](Script/kf_hole.bat) | 填洞：挖掉 −10 °C，另训舰队再四档对照 | `python Src/AI/KF/hole.py` |
 | [`Script/kf_meas.bat`](Script/kf_meas.bat) | 测量列舰队 + ×1.15 四档 | `train.py --use-meas-inputs` 再 `compare.py --task meas` |
+| [`Script/kf_dr0.bat`](Script/kf_dr0.bat) | \(\delta R_0\)：MLP \(R_0\) ×1.2，开关对照 | `run.py --best --r0-scale 1.2` 与 `--dr0` |
+| [`Script/kf_neg.bat`](Script/kf_neg.bat) | 小时级负例 + 门控 | `nmc100ah_ecm_gen_long.py` 再 `run.py` |
 | [`autogit.bat`](autogit.bat) | `pull` → `add *` → `commit` → `push` | 见文件内四行 git |
 | [`clean.bat`](clean.bat) | 删掉 `.gitignore` 匹配的文件（先确认 Y） | `git clean -fdX` |
 

@@ -112,6 +112,24 @@ python Src/AI/KF/compare.py --task meas --mlp-dir Data/ai_mlp_meas --new-dir Dat
 
 读数见 `Doc/10` §7.3：底板大约 +3 mV，×1.15 仍走缩放。
 
+\(\delta R_0\)（任务 E）同一条 BOL 波，只把 MLP 的 \(R_0\) ×1.2：
+
+```powershell
+python Src/AI/KF/run.py --best --r0-scale 1.2 --out Data/ai_kf/dr0_off.csv
+python Src/AI/KF/run.py --best --r0-scale 1.2 --dr0 --out Data/ai_kf/dr0_on.csv
+```
+
+读数见 `Doc/10` §7.4：开环仍大；打开后 SOC / NIS 回到默认，不要因此改 MLP。
+
+小时级负例（任务 F）不要改默认 `SEQUENCE`：
+
+```powershell
+python Src/Sim/nmc100ah_ecm_gen_long.py
+python Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv
+```
+
+读数见 `Doc/10` §7.5。健康长恒流门控拒；零偏 / 容量错 NIS 仍健康，过了也不许拆 \(R\)。
+
 权重写到 `Data/ai_kf/incr/`，**不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 
 ```powershell

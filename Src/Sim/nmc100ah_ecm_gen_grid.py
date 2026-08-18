@@ -112,7 +112,9 @@ def run_grid(
     r0_scale: float = 1.0,
     r1_scale: float = 1.0,
     c1_scale: float = 1.0,
+    sequence: list[dict] | None = None,
 ) -> list[dict]:
+    seq = SEQUENCE if sequence is None else sequence
     soc_axis, t_axis = build_grid(n_soc, n_temp)
     n_soc, n_temp = int(soc_axis.size), int(t_axis.size)
     out_dir = Path(output_dir)
@@ -170,7 +172,7 @@ def run_grid(
             assert model is not None
             data = simulate(
                 model,
-                SEQUENCE,
+                seq,
                 dt_s=DT_S,
                 soc0=float(soc0),
                 t_ambient_c=float(t_c),
@@ -188,7 +190,7 @@ def run_grid(
                 noise_enable=noise_enable,
                 noise_seed=seed,
                 noise_std=NOISE_STD,
-                sequence=SEQUENCE,
+                sequence=seq,
                 extra_meta=[
                     "# source=nmc100ah_ecm_gen_grid",
                     f"# t0_c={t_c}",

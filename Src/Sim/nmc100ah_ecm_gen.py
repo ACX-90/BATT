@@ -8,6 +8,12 @@
 
     python Src/Sim/nmc100ah_ecm_gen.py
     python Src/Sim/nmc100ah_ecm_gen.py --out Data/my_run.csv
+    python Src/Sim/nmc100ah_ecm_gen.py --out Data/long/cc_rest.csv --soc0 0.70
+
+其它模块不要改本文件头部的 SEQUENCE。传入可选工况：
+
+    from nmc100ah_ecm_gen import run_sim
+    run_sim(out="Data/long/cc_rest.csv", sequence=my_seq, soc0=0.70)
 """
 
 from __future__ import annotations
@@ -349,9 +355,68 @@ def write_csv(
     return path
 
 
-def _summarize(data: dict[str, np.ndarray]) -> None:
+def run_sim(
+    *,
+    out: str | Path = OUTPUT_CSV,
+    sequence: list[dict] | None = None,
+    soc0: float | None = None,
+    t_ambient_c: float | None = None,
+    u_p0: float | None = None,
+    dt_s: float | None = None,
+    noise_enable: bool | None = None,
+    noise_seed: int | None = None,
+    noise_std: dict[str, float] | None = None,
+    enable_cutoff: bool | None = None,
+    extra_meta: list[str] | None = None,
+    model: NMC100AhECM | None = None,
+    summarize: bool = True,
+) -> Path:
+    """跑一条轨迹并写 CSV。sequence / soc0 等为 None 时用本文件头部默认，不改默认网格。"""
+    seq = SEQUENCE if sequence is None else list(sequence)
+    s0 = SOC0 if soc0 is None else float(soc0)
+    t_c = T_AMBIENT_C if t_ambient_c is None else float(t_ambient_c)
+    up0 = U_P0 if u_p0 is None else float(u_p0)
+    dt = DT_S if dt_s is None else float(dt_s)
+    if dt <= 0:
+        raise ValueError("dt_s 必须 > 0")
+    n_en = NOISE_ENABLE if noise_enable is None else bool(noise_enable)
+    seed = NOISE_SEED if noise_seed is None else int(noise_seed)
+    std = dict(NOISE_STD if noise_std is None else noise_std)
+    cut = ENABLE_CUTOFF if enable_cutoff is None else bool(enable_cutoff)
+    cell = NMC100AhECM() if model is None else model
+
+    data = simulate(
+        cell,
+        seq,
+        dt_s=dt,
+        soc0=s0,
+        t_ambient_c=t_c,
+        u_p0=up0,
+        noise_enable=n_en,
+        noise_seed=seed,
+        noise_std=std,
+        enable_cutoff=cut,
+    )
+    path = write_csv(
+        out,
+        data,
+        dt_s=dt,
+        soc0=s0,
+        noise_enable=n_en,
+        noise_seed=seed,
+        noise_std=std,
+        sequence=seq,
+        extra_meta=extra_meta,
+    )
+    print(f"已写出 {path}")
+    if summarize:
+        _summarize(data, dt_s=dt)
+    return path
+
+
+def _summarize(data: dict[str, np.ndarray], *, dt_s: float = DT_S) -> None:
     t = data["time_s"]
-    print(f"步数 {len(t)}  时长 {t[-1] + DT_S:.1f} s  步长 {DT_S} s")
+    print(f"步数 {len(t)}  时长 {t[-1] + dt_s:.1f} s  步长 {dt_s} s")
     print(
         f"SOC  {data['soc_true'][0]:.4f} -> {data['soc_true'][-1]:.4f}    "
         f"Ut   {data['u_t_true_v'][0]:.4f} -> {data['u_t_true_v'][-1]:.4f} V"
@@ -370,41 +435,19 @@ def _summarize(data: dict[str, np.ndarray]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="NMC 100Ah ECM 时域仿真，输出 Data/*.csv")
     parser.add_argument("--out", default=OUTPUT_CSV, help="输出 CSV 路径")
+    parser.add_argument("--soc0", type=float, default=None, help="覆盖头部 SOC0")
+    parser.add_argument("--t-ambient", type=float, default=None, help="覆盖头部环境温度 / °C")
     parser.add_argument("--seed", type=int, default=None, help="覆盖头部 NOISE_SEED")
     parser.add_argument("--no-noise", action="store_true", help="关闭噪声")
     args = parser.parse_args()
 
-    if DT_S <= 0:
-        raise ValueError("DT_S 必须 > 0")
-
-    model = NMC100AhECM()
-    noise_enable = NOISE_ENABLE and not args.no_noise
-    noise_seed = NOISE_SEED if args.seed is None else args.seed
-
-    data = simulate(
-        model,
-        SEQUENCE,
-        dt_s=DT_S,
-        soc0=SOC0,
-        t_ambient_c=T_AMBIENT_C,
-        u_p0=U_P0,
-        noise_enable=noise_enable,
-        noise_seed=noise_seed,
-        noise_std=NOISE_STD,
-        enable_cutoff=ENABLE_CUTOFF,
+    run_sim(
+        out=args.out,
+        soc0=args.soc0,
+        t_ambient_c=args.t_ambient,
+        noise_enable=False if args.no_noise else None,
+        noise_seed=args.seed,
     )
-    path = write_csv(
-        args.out,
-        data,
-        dt_s=DT_S,
-        soc0=SOC0,
-        noise_enable=noise_enable,
-        noise_seed=noise_seed,
-        noise_std=NOISE_STD,
-        sequence=SEQUENCE,
-    )
-    print(f"已写出 {path}")
-    _summarize(data)
 
 
 if __name__ == "__main__":

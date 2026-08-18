@@ -20,6 +20,7 @@ def softplus_inv(y: float) -> float:
     return math.log(math.expm1(y))
 
 
+# 继承nn.Module特性
 class ParamMLP(nn.Module):
     def __init__(self, cfg: TrainConfig) -> None:
         # 必须调用，否则参数注册、设备迁移等会出问题。

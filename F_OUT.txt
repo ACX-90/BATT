@@ -1,0 +1,54 @@
+RUN python -u Src/Sim/nmc100ah_ecm_gen_long.py
+======== cc_rest  F-cc_rest ========
+已写出 C:\Users\pyx private\Desktop\BATT\Data\long\cc_rest.csv
+步数 90300  时长 9030.0 s  步长 0.1 s
+SOC  0.7000 -> 0.1000    Ut   3.8000 -> 3.5450 V
+Ut_meas  std(残差)=0.50 mV  I_meas std(残差)=10.0 mA
+模式步数  discharge=72000, rest=18300
+======== chg_park  F-chg_park ========
+已写出 C:\Users\pyx private\Desktop\BATT\Data\long\chg_park.csv
+步数 96300  时长 9630.0 s  步长 0.1 s
+SOC  0.3000 -> 0.8954    Ut   3.6300 -> 4.0140 V
+Ut_meas  std(残差)=0.50 mV  I_meas std(残差)=10.0 mA
+模式步数  charge=21433, rest=74867
+触发保护步数  2567
+RUN python -u Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv --export Data/ai_kf/logs/neg_cc.csv --out Data/ai_kf/neg_cc.csv --fig Fig/kf_neg_cc.png
+权重  C:\Users\pyx private\Desktop\BATT\Data\ai_mlp\best.pt
+输入  C:\Users\pyx private\Desktop\BATT\Data\long\cc_rest.csv
+电压  开环 RMSE=1.22 mV  先验=0.65 mV  后验=0.11 mV
+SOC   安时 RMSE=0.000 pp  EKF RMSE=0.290 pp  终点 安时 +0.000 / EKF +0.063 pp
+NIS   中位=0.13  均值=0.29
+门控  拒绝：开环 RMSE 1.22 mV 未明显高于测量噪声
+表    C:\Users\pyx private\Desktop\BATT\Data\ai_kf\neg_cc.csv
+增量日志  C:\Users\pyx private\Desktop\BATT\Data\ai_kf\logs\neg_cc.csv
+图    C:\Users\pyx private\Desktop\BATT\Fig\kf_neg_cc.png
+RUN python -u Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv --current-bias 5 --export Data/ai_kf/logs/neg_bias.csv --out Data/ai_kf/neg_bias.csv --fig Fig/kf_neg_bias.png
+权重  C:\Users\pyx private\Desktop\BATT\Data\ai_mlp\best.pt
+输入  C:\Users\pyx private\Desktop\BATT\Data\long\cc_rest.csv
+电压  开环 RMSE=142.77 mV  先验=0.66 mV  后验=0.11 mV
+SOC   安时 RMSE=6.844 pp  EKF RMSE=1.073 pp  终点 安时 -10.000 / EKF +1.404 pp
+NIS   中位=0.13  均值=0.29
+门控  通过
+表    C:\Users\pyx private\Desktop\BATT\Data\ai_kf\neg_bias.csv
+增量日志  C:\Users\pyx private\Desktop\BATT\Data\ai_kf\logs\neg_bias.csv
+图    C:\Users\pyx private\Desktop\BATT\Fig\kf_neg_bias.png
+RUN python -u Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv --capacity-scale 0.95 --export Data/ai_kf/logs/neg_q.csv --out Data/ai_kf/neg_q.csv --fig Fig/kf_neg_q.png
+权重  C:\Users\pyx private\Desktop\BATT\Data\ai_mlp\best.pt
+输入  C:\Users\pyx private\Desktop\BATT\Data\long\cc_rest.csv
+电压  开环 RMSE=21.85 mV  先验=0.65 mV  后验=0.11 mV
+SOC   安时 RMSE=2.154 pp  EKF RMSE=0.356 pp  终点 安时 -3.158 / EKF +0.037 pp
+NIS   中位=0.13  均值=0.29
+门控  通过
+表    C:\Users\pyx private\Desktop\BATT\Data\ai_kf\neg_q.csv
+增量日志  C:\Users\pyx private\Desktop\BATT\Data\ai_kf\logs\neg_q.csv
+图    C:\Users\pyx private\Desktop\BATT\Fig\kf_neg_q.png
+RUN python -u Src/AI/KF/run.py --best --csv Data/long/chg_park.csv --export Data/ai_kf/logs/neg_park.csv --out Data/ai_kf/neg_park.csv --fig Fig/kf_neg_park.png
+权重  C:\Users\pyx private\Desktop\BATT\Data\ai_mlp\best.pt
+输入  C:\Users\pyx private\Desktop\BATT\Data\long\chg_park.csv
+电压  开环 RMSE=2.42 mV  先验=0.66 mV  后验=0.11 mV
+SOC   安时 RMSE=0.000 pp  EKF RMSE=0.365 pp  终点 安时 +0.000 / EKF -0.002 pp
+NIS   中位=0.13  均值=0.29
+门控  通过
+表    C:\Users\pyx private\Desktop\BATT\Data\ai_kf\neg_park.csv
+增量日志  C:\Users\pyx private\Desktop\BATT\Data\ai_kf\logs\neg_park.csv
+图    C:\Users\pyx private\Desktop\BATT\Fig\kf_neg_park.png

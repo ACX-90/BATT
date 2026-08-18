@@ -1,0 +1,29 @@
+{
+  "ckpt": "C:\\Users\\pyx private\\Desktop\\BATT\\Data\\ai_mlp\\best.pt",
+  "csv": "C:\\Users\\pyx private\\Desktop\\BATT\\Data\\long\\chg_park.csv",
+  "stats": {
+    "e_ol_rmse_mV": 2.4189985933185456,
+    "e_pri_rmse_mV": 0.6577322104730663,
+    "e_post_rmse_mV": 0.11258736268222387,
+    "nis_median": 0.1338140959133129,
+    "nis_mean": 0.2940075539725777,
+    "s_end_ah": 0.8953618349376883,
+    "s_end_post": 0.8953381338978447,
+    "s_ah_rmse": 6.295141681356808e-07,
+    "s_post_rmse": 0.0036526161292379043,
+    "s_end_true": 0.89536111,
+    "s_end_ah_err": 7.249376883233793e-07,
+    "s_end_post_err": -2.297610215529211e-05
+  },
+  "gate": {
+    "nis_median": 0.1338140959133129,
+    "nis_max_run": 0.0,
+    "e_ol_rms_mV": 2.4189985933185456,
+    "has_edge": 1.0,
+    "rest_s": 7456.700000000001,
+    "t_min": 24.758584,
+    "t_max": 25.24996,
+    "t_ok": 1.0
+  },
+  "accepted": true
+}

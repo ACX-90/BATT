@@ -80,7 +80,14 @@ python Src/Sim/nmc100ah_ecm_gen.py --out Data/my_run.csv
 python Src/Sim/nmc100ah_ecm_gen.py --no-noise
 ```
 
-`Script/gen_common.bat` 等价于第一条。
+`Script/gen_common.bat` 等价于第一条。其它模块不要改本文件头部 `SEQUENCE`，传入可选工况：
+
+```python
+from nmc100ah_ecm_gen import run_sim
+run_sim(out="Data/long/cc_rest.csv", sequence=my_seq, soc0=0.70)
+```
+
+小时级负例（任务 F）走 `nmc100ah_ecm_gen_long.py`，默认网格工况不变。
 
 默认写出 `Data/nmc100ah_ecm_sim.csv`。前几行是 `#` 元数据，pandas 读取时加 `comment="#"`。
 

@@ -59,6 +59,7 @@ def infer_csv(model: ParamMLP, scaler: FeatureScaler, cfg: TrainConfig, csv_path
     x = torch.from_numpy(scaler.transform(feat).astype(np.float32)).unsqueeze(0)
     i = torch.from_numpy(raw[i_key].astype(np.float32)).unsqueeze(0)
     u_ocv = torch.from_numpy(raw["u_ocv_v"].astype(np.float32)).unsqueeze(0)
+    # 调用MLP，其中ParamMLP类型继承nn.Module，此类型无__call__时自动调forward方法
     r0, r1, c1 = model(x)
     u_hat, u_p = ecm_forward(i, u_ocv, r0, r1, c1, dt_s=cfg.dt_s)
     return {

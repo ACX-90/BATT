@@ -1,0 +1,29 @@
+{
+  "ckpt": "C:\\Users\\pyx private\\Desktop\\BATT\\Data\\ai_mlp\\best.pt",
+  "csv": "C:\\Users\\pyx private\\Desktop\\BATT\\Data\\long\\cc_rest.csv",
+  "stats": {
+    "e_ol_rmse_mV": 21.853974118085688,
+    "e_pri_rmse_mV": 0.6545766332023015,
+    "e_post_rmse_mV": 0.11264903306147188,
+    "nis_median": 0.13461165867619165,
+    "nis_mean": 0.2937440083328858,
+    "s_end_ah": 0.06842196604254697,
+    "s_end_post": 0.10037085708297229,
+    "s_ah_rmse": 0.0215363718695207,
+    "s_post_rmse": 0.0035596071825912227,
+    "s_end_true": 0.1,
+    "s_end_ah_err": -0.03157803395745304,
+    "s_end_post_err": 0.00037085708297228404
+  },
+  "gate": {
+    "nis_median": 0.13461165867619165,
+    "nis_max_run": 0.0,
+    "e_ol_rms_mV": 21.853974118085688,
+    "has_edge": 1.0,
+    "rest_s": 1800.0,
+    "t_min": 24.800111,
+    "t_max": 25.207221,
+    "t_ok": 1.0
+  },
+  "accepted": true
+}
