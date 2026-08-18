@@ -80,7 +80,7 @@ class MlpParamProvider:
 
 
 class ScaleAdapter(nn.Module):
-    """冻住 MLP，只学 R0'=k0 R0、R1'=k1 R1（Doc/05 §3.5）。"""
+    """冻住 MLP，只学 R0'=k0 R0、R1'=k1 R1（Doc/03-a §3.5）。"""
 
     def __init__(self, base: ParamMLP) -> None:
         super().__init__()

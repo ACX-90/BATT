@@ -6,7 +6,7 @@
     C1 同结构。
 
 因子在参考点 (SOC=50%, T=25°C, I=100 A 放电) 处均为 1。
-方程与默认数值见 Doc/02-NMC100Ah_ECM参数规范.md。
+方程与默认数值见 Doc/01-b-NMC100Ah_ECM参数规范.md。
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""增量门控：健康滤波 + 开环有内容 + 激励足够 + 温度未出旧 scaler（Doc/06 §4.1）。"""
+"""增量门控：健康滤波 + 开环有内容 + 激励足够 + 温度未出旧 scaler（Doc/03-c §4.1）。"""
 
 from __future__ import annotations
 

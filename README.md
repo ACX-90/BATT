@@ -99,7 +99,7 @@ U_t = U_{\mathrm{ocv}}(\mathrm{SOC},T) - I R_0 - U_p
 P = P_ref · f_SOC · f_相变 · f_T · f_I · f_充放
 ```
 
-公式和默认系数见 [`Doc/02-NMC100Ah_ECM参数规范.md`](Doc/02-NMC100Ah_ECM参数规范.md)。
+公式和默认系数见 [`Doc/01-b-NMC100Ah_ECM参数规范.md`](Doc/01-b-NMC100Ah_ECM参数规范.md)。
 
 ## 模块一览
 
@@ -198,15 +198,17 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 
 | 文档 | 内容 |
 |------|------|
-| [`Doc/01-NCM电芯ECM参数R0_R1_C1特性.md`](Doc/01-NCM电芯ECM参数R0_R1_C1特性.md) | \(R_0,R_1,C_1\) 特性；§7 二阶 RC，§8 更高阶 |
-| [`Doc/02-NMC100Ah_ECM参数规范.md`](Doc/02-NMC100Ah_ECM参数规范.md) | 乘性结构、默认系数；§11 为 100 Ah 的 2RC 估算 |
-| [`Doc/03-MLP-ECM物理信息参数估计.md`](Doc/03-MLP-ECM物理信息参数估计.md) | 方案 A：电压反传；§11 阶次不足时误差落到哪 |
-| [`Doc/04-MLP-ECM固定C1方案与对比.md`](Doc/04-MLP-ECM固定C1方案与对比.md) | 方案 B / B+；§10 为 1RC BMS 对 2RC / 更高阶的误差预算 |
-| [`Doc/05-MLP-ECM增量学习方案与问题.md`](Doc/05-MLP-ECM增量学习方案与问题.md) | `--resume` 不是增量；回放 / 缩放 / 扩维及本仓库的坑 |
-| [`Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md`](Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md) | EKF 估 SOC；MLP / ECM / KF 分工；用开环电压误差增量 |
-| [`Doc/07-英飞凌残差头增量学习方案评估.md`](Doc/07-英飞凌残差头增量学习方案评估.md) | 3×8×2 残差头；每芯 18 个数；10 mV / 0.1 s 反传 |
-| [`Doc/08-TC4D7-PPU与800V系统融合评估.md`](Doc/08-TC4D7-PPU与800V系统融合评估.md) | TC4D7+PPU、800 V 包上按 demo 评估，再谈优化 |
-| [`Doc/09-非MLP结构GRU-LSTM评估.md`](Doc/09-非MLP结构GRU-LSTM评估.md) | 循环核不宜换点式头；滑窗多拍残差是训练协议 |
-| [`Doc/10-合成增量对照实验.md`](Doc/10-合成增量对照实验.md) | 合成增量对照：×1.15 数字 + 填洞 / 同分布 / 测量列 / δR0 / 小时负例做法 |
+| [`Doc/01-a-NCM电芯ECM参数R0_R1_C1特性.md`](Doc/01-a-NCM电芯ECM参数R0_R1_C1特性.md) | \(R_0,R_1,C_1\) 特性；§7 二阶 RC，§8 更高阶 |
+| [`Doc/01-b-NMC100Ah_ECM参数规范.md`](Doc/01-b-NMC100Ah_ECM参数规范.md) | 乘性结构、默认系数；§11 为 100 Ah 的 2RC 估算 |
+| [`Doc/02-a-MLP-ECM物理信息参数估计.md`](Doc/02-a-MLP-ECM物理信息参数估计.md) | 方案 A：电压反传；§11 阶次不足时误差落到哪 |
+| [`Doc/02-b-MLP-ECM固定C1方案与对比.md`](Doc/02-b-MLP-ECM固定C1方案与对比.md) | 方案 B / B+；§10 为 1RC BMS 对 2RC / 更高阶的误差预算 |
+| [`Doc/03-a-MLP-ECM增量学习方案与问题.md`](Doc/03-a-MLP-ECM增量学习方案与问题.md) | `--resume` 不是增量；回放 / 缩放 / 扩维及本仓库的坑 |
+| [`Doc/03-b-非MLP结构GRU-LSTM评估.md`](Doc/03-b-非MLP结构GRU-LSTM评估.md) | 循环核不宜换点式头；滑窗多拍残差是训练协议 |
+| [`Doc/03-c-卡尔曼SOC与MLP-ECM融合增量学习.md`](Doc/03-c-卡尔曼SOC与MLP-ECM融合增量学习.md) | EKF 估 SOC；MLP / ECM / KF 分工；用开环电压误差增量 |
+| [`Doc/03-d-英飞凌残差头增量学习方案评估.md`](Doc/03-d-英飞凌残差头增量学习方案评估.md) | 3×8×2 残差头；每芯 18 个数；10 mV / 0.1 s 反传 |
+| [`Doc/04-a-合成增量对照实验.md`](Doc/04-a-合成增量对照实验.md) | 第 0 期前半 A–F 对照数字（涨阻 / 填洞 / 同分布 / 测量列 / δR0 / 小时负例） |
+| [`Doc/04-b-增量学习应用手册.md`](Doc/04-b-增量学习应用手册.md) | 增量怎么用：按任务选档、门控、验收、现场流程 |
+| [`Doc/A0-a-TC4D7-PPU与800V系统融合评估.md`](Doc/A0-a-TC4D7-PPU与800V系统融合评估.md) | TC4D7+PPU、800 V 包上按 demo 评估，再谈优化 |
+| [`Doc/A0-b-ST与NXP的AI-MCU对照.md`](Doc/A0-b-ST与NXP的AI-MCU对照.md) | ST P3E / NXP S32K37·K5 与英飞凌 TC4D7 对照 |
 
 子目录 `readme.md` 写各自的命令、列名和配置项。

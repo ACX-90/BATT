@@ -31,7 +31,7 @@
 ::   python Src/AI/KF/hole.py --split-only
 ::   python Src/AI/KF/hole.py --smoke
 ::
-:: acceptance (Doc/10 §7.1): Replay/retrain old-set worsen < 20%;
+:: acceptance (Doc/04 §7.1): Replay/retrain old-set worsen < 20%;
 :: scale k ~ 1; finetune is the failure control.
 :: =============================================================================
 

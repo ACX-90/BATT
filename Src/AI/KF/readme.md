@@ -2,7 +2,7 @@
 
 状态只含 \((s,U_p)\)。MLP 仍只出 \((R_0,R_1)\)（方案 B 下 \(C_1\) 钉死），ECM 算 \(\hat U_t\)。卡尔曼每拍用电压创新改正 SOC 和极化，**不改 MLP 权重**。
 
-设计见 `Doc/06-卡尔曼SOC与MLP-ECM融合增量学习.md`、`Doc/05-MLP-ECM增量学习方案与问题.md`。
+设计见 `Doc/03-c-卡尔曼SOC与MLP-ECM融合增量学习.md`、`Doc/03-a-MLP-ECM增量学习方案与问题.md`。
 
 请在**仓库根目录**运行。依赖：`numpy`、`torch`（出图再加 `matplotlib`）。先有 `Data/ai_mlp/` 的权重和 `scaler.json`。
 
@@ -91,7 +91,7 @@ python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15 --epochs 
 python Src/AI/KF/compare.py --smoke
 ```
 
-`--make-new` 把缩放网格写到 `--new-dir`（默认 `Data/soh_k115/`），**不碰** `Data/grid/`。结果在 `Data/ai_kf/compare/compare.md`。读数与其余档做法见 [`Doc/10-合成增量对照实验.md`](../../Doc/10-合成增量对照实验.md)。整体涨阻时 `scale` 不该明显输给 `retrain`；`finetune` 旧集变差是预期失败对照。
+`--make-new` 把缩放网格写到 `--new-dir`（默认 `Data/soh_k115/`），**不碰** `Data/grid/`。结果在 `Data/ai_kf/compare/compare.md`。读数见 [`Doc/04-a`](../../Doc/04-a-合成增量对照实验.md)，用法见 [`Doc/04-b`](../../Doc/04-b-增量学习应用手册.md)。整体涨阻时 `scale` 不该明显输给 `retrain`；`finetune` 旧集变差是预期失败对照。
 
 填洞（任务 B，挖掉 −10 °C）走 `hole.py`，不要对全网格舰队做增量：
 
@@ -101,7 +101,7 @@ python Src/AI/KF/hole.py --split-only
 python Src/AI/KF/hole.py --compare-only
 ```
 
-写出 `Data/grid_wo_tm10/`、`Data/grid_tm10/`、`Data/ai_mlp_hole/`、`Data/ai_kf/compare_hole/`。`--task hole` 只改 `compare.md` 的验收口径。读数见 [`Doc/10`](../../Doc/10-合成增量对照实验.md) §7.1：Replay / 重训为正途，缩放 \(k\) 会拆开。
+写出 `Data/grid_wo_tm10/`、`Data/grid_tm10/`、`Data/ai_mlp_hole/`、`Data/ai_kf/compare_hole/`。`--task hole` 只改 `compare.md` 的验收口径。读数见 [`Doc/04-a`](../../Doc/04-a-合成增量对照实验.md) §7.1：Replay / 重训为正途，缩放 \(k\) 会拆开。
 
 测量列舰队（任务 D）不要改 `config.py` 默认值：
 
@@ -110,7 +110,7 @@ python Src/AI/MLP/train.py --scheme B --epochs 100 --out-dir Data/ai_mlp_meas --
 python Src/AI/KF/compare.py --task meas --mlp-dir Data/ai_mlp_meas --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_kf/compare_meas
 ```
 
-读数见 `Doc/10` §7.3：底板大约 +3 mV，×1.15 仍走缩放。
+读数见 `Doc/04-a` §7.3：底板大约 +3 mV，×1.15 仍走缩放。
 
 \(\delta R_0\)（任务 E）同一条 BOL 波，只把 MLP 的 \(R_0\) ×1.2：
 
@@ -119,7 +119,7 @@ python Src/AI/KF/run.py --best --r0-scale 1.2 --out Data/ai_kf/dr0_off.csv
 python Src/AI/KF/run.py --best --r0-scale 1.2 --dr0 --out Data/ai_kf/dr0_on.csv
 ```
 
-读数见 `Doc/10` §7.4：开环仍大；打开后 SOC / NIS 回到默认，不要因此改 MLP。
+读数见 `Doc/04-a` §7.4：开环仍大；打开后 SOC / NIS 回到默认，不要因此改 MLP。
 
 小时级负例（任务 F）不要改默认 `SEQUENCE`：
 
@@ -128,7 +128,7 @@ python Src/Sim/nmc100ah_ecm_gen_long.py
 python Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv
 ```
 
-读数见 `Doc/10` §7.5。健康长恒流门控拒；零偏 / 容量错 NIS 仍健康，过了也不许拆 \(R\)。
+读数见 `Doc/04` §7.5。健康长恒流门控拒；零偏 / 容量错 NIS 仍健康，过了也不许拆 \(R\)。
 
 权重写到 `Data/ai_kf/incr/`，**不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 

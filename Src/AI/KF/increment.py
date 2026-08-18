@@ -1,6 +1,6 @@
 """离线增量：冻 scaler，开环电压损失，Replay 或缩放适配。
 
-不要用 e_post，不要逐步 backward，不要重拟合 scaler（Doc/05、Doc/06）。
+不要用 e_post，不要逐步 backward，不要重拟合 scaler（Doc/03-a、Doc/03-c）。
 用法（仓库根目录）：
 
     python Src/AI/KF/increment.py --mode replay --new-dir Data/ai_kf/logs --replay-dir Data/grid
