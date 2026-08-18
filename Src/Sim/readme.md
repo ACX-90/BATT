@@ -80,7 +80,7 @@ python Src/Sim/nmc100ah_ecm_gen.py --out Data/my_run.csv
 python Src/Sim/nmc100ah_ecm_gen.py --no-noise
 ```
 
-仓库根目录 `gen_common.bat` 等价于第一条。
+`Script/gen_common.bat` 等价于第一条。
 
 默认写出 `Data/nmc100ah_ecm_sim.csv`。前几行是 `#` 元数据，pandas 读取时加 `comment="#"`。
 
@@ -113,7 +113,7 @@ python Src/Sim/nmc100ah_ecm_gen_grid.py --out-dir Data/soh_k115 --r0-scale 1.15 
 
 `--r0-scale` / `--r1-scale` 把解析 \(R\) 整张乘常数后再仿真，用来造换对象 / 假老化。必须换 `--out-dir`，不要写回 `Data/grid/`。
 
-仓库根目录 `gen_grid.bat` 跑的是 `--n-soc 10 --n-temp 10`（100 份）。
+`Script/gen_grid.bat` 跑的是 `--n-soc 10 --n-temp 10`（100 份）。
 
 正式跑之前会先删掉输出目录里已有的 `*.csv`（含 `index.csv`），避免换档数后旧文件混进训练集。`--dry-run` 不删、不写。
 

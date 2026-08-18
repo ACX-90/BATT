@@ -1,11 +1,12 @@
 @echo off
 :: =============================================================================
-:: gen_grid.bat  -  SOC x temperature grid for training waveforms
+:: Script\gen_grid.bat  -  SOC x temperature grid for training waveforms
 :: =============================================================================
 ::
 :: usage
-::   double-click in repo root, or:
-::     gen_grid.bat
+::   double-click this file, or from repo root:
+::     Script\gen_grid.bat
+::   working directory is forced to the repo root
 ::
 :: what it does
 ::   same SEQUENCE and noise as nmc100ah_ecm_gen.py
@@ -46,5 +47,5 @@
 ::   see Src/Sim/readme.md
 :: =============================================================================
 
-python .\Src\Sim\nmc100ah_ecm_gen_grid.py --n-soc 10 --n-temp 10
+python .\..\Src\Sim\nmc100ah_ecm_gen_grid.py --n-soc 10 --n-temp 10
 pause

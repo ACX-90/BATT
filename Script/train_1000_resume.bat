@@ -1,11 +1,12 @@
 @echo off
 :: =============================================================================
-:: train_1000_resume.bat  -  continue scheme B for 1000 more voltage epochs
+:: Script\train_1000_resume.bat  -  continue scheme B for 1000 more voltage epochs
 :: =============================================================================
 ::
 :: usage
-::   double-click in repo root, or:
-::     train_1000_resume.bat
+::   double-click this file, or from repo root:
+::     Script\train_1000_resume.bat
+::   working directory is forced to the repo root
 ::
 :: prerequisites
 ::   Data/ai_mlp already has weights: last.pt or ckpts/epoch_XXXXX.pt
@@ -46,5 +47,5 @@
 ::   see Src/AI/MLP/readme.md
 :: =============================================================================
 
-python Src/AI/MLP/train.py --scheme B --epochs 1000 --resume
+python ./../Src/AI/MLP/train.py --scheme B --epochs 1000 --resume
 pause

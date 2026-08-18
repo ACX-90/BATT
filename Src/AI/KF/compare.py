@@ -6,6 +6,7 @@
     python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15
     python Src/AI/KF/compare.py --new-dir Data/soh_k115 --epochs 10
     python Src/AI/KF/compare.py --smoke
+    python Src/AI/KF/hole.py
 """
 
 from __future__ import annotations
@@ -258,7 +259,43 @@ def _pct(after: list | None, before: list | None, idx: int) -> str:
     return f"{(after[idx] / before[idx] - 1.0) * 100:+.1f}%"
 
 
-def write_table(rows: list[dict], out_dir: Path) -> None:
+TASK_FOOTERS = {
+    "aging": [
+        "通过口径（涨阻 / `Doc/10` 任务 A）：",
+        "",
+        "- 新轨迹开环 RMSE 低于冻结直接推理",
+        "- `scale` 的两个 k 齐、朝电阻乘子走；旧集变差是缺维，不是遗忘失败",
+        "- `finetune` 电压贴上但两通道不齐，记失败对照",
+        "- 表是最后一轮，不是 `best.pt`",
+    ],
+    "hole": [
+        "通过口径（填洞 / `Doc/10` 任务 B，`Doc/05` §8）：",
+        "",
+        "- 冻结：新温区明显差于旧集（外推）",
+        "- Replay / 重训：新 RMSE 下降；旧集恶化 < 20%；参考点接近增量前",
+        "- 缩放：k ≈ 1，新年份几乎不降（全局乘子补不出低温曲面）",
+        "- 只微调：新年份会贴、旧中温应变差（失败对照）",
+        "- 正途是 Replay / 重训，不是缩放。表是最后一轮，不是 `best.pt`",
+    ],
+    "iid": [
+        "通过口径（同分布负例 / `Doc/10` 任务 C）：",
+        "",
+        "- 冻结新年份应已接近旧集，不是涨阻那档的二十多毫伏",
+        "- 缩放 k 停在 1 附近；参考点几乎不动",
+        "- 微调 / Replay 再削新电压却抬旧集，记成同分布过拟合，不是增量成功",
+    ],
+    "meas": [
+        "通过口径（测量列舰队 / `Doc/10` 任务 D）：",
+        "",
+        "- 对照任务 A 同一张 ×1.15 表；冻结新/旧相对 A 各抬多少，才是输入域差",
+        "- 涨阻结论应仍是缩放；这几个毫伏不该推翻 k 为正途",
+        "- 若冻结旧集已到和 A 新年份一个量级，先查列有没有用反",
+        "- 表是最后一轮，不是 `best.pt`",
+    ],
+}
+
+
+def write_table(rows: list[dict], out_dir: Path, task: str = "aging") -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     fields = [
         "mode",
@@ -333,21 +370,11 @@ def write_table(rows: list[dict], out_dir: Path) -> None:
             f"({_pct(meta.get('ref_after_mohm'), meta.get('ref_before_mohm'), 1)}) "
             f"| {ktxt} |"
         )
-    md_lines.extend(
-        [
-            "",
-            "通过口径（`Plan.md` / `Doc/05` §8）：",
-            "",
-            "- 旧网格开环 RMSE 不明显差于冻结（恶化 < 20%）",
-            "- 新轨迹开环 RMSE 低于冻结直接推理",
-            "- 整体涨阻任务：`scale` 的两个 k 不该明显输给解冻整网；参考点漂移应接近电阻乘子",
-            "- `finetune` 旧集变差记成失败对照，不是调参目标",
-            "",
-        ]
-    )
+    md_lines.extend(["", *TASK_FOOTERS.get(task, TASK_FOOTERS["aging"]), ""])
     (out_dir / "compare.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")
     (out_dir / "compare.json").write_text(
-        json.dumps({"rows": rows, "table": table_rows}, indent=2, ensure_ascii=False) + "\n",
+        json.dumps({"task": task, "rows": rows, "table": table_rows}, indent=2, ensure_ascii=False)
+        + "\n",
         encoding="utf-8",
     )
     print(f"\n对照表  {csv_path}")
@@ -360,6 +387,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--old-dir", default="Data/grid")
     p.add_argument("--new-dir", default="Data/soh_k115")
     p.add_argument("--out-dir", default="Data/ai_kf/compare")
+    p.add_argument(
+        "--task",
+        default="aging",
+        choices=tuple(TASK_FOOTERS),
+        help="只改对照表验收口径：aging=涨阻，hole=填洞，iid=同分布",
+    )
     p.add_argument("--modes", default="frozen,retrain,replay,finetune,scale")
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--scale-epochs", type=int, default=None)
@@ -418,7 +451,7 @@ def main() -> None:
         raise ValueError(f"未知档位 {unknown}，可选 {MODES}")
 
     rows = [run_one(mode, args, old_dir, new_dir) for mode in modes]
-    write_table(rows, _resolve(args.out_dir))
+    write_table(rows, _resolve(args.out_dir), task=args.task)
 
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
 @echo off
 :: =============================================================================
-:: train_100.bat  -  train MLP-ECM from scratch, scheme B, 100 voltage epochs
+:: Script\train_100.bat  -  train MLP-ECM from scratch, scheme B, 100 voltage epochs
 :: =============================================================================
 ::
 :: usage
-::   double-click in repo root, or:
-::     train_100.bat
+::   double-click this file, or from repo root:
+::     Script\train_100.bat
+::   working directory is forced to the repo root
 ::
 :: prerequisites
 ::   run gen_grid.bat first, or: python Src/Sim/nmc100ah_ecm_gen_grid.py
@@ -44,5 +45,5 @@
 ::   see Src/AI/MLP/readme.md
 :: =============================================================================
 
-python Src/AI/MLP/train.py --scheme B --epochs 100
+python ./../Src/AI/MLP/train.py --scheme B --epochs 100
 pause

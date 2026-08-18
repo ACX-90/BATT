@@ -1,12 +1,13 @@
 @echo off
 :: =============================================================================
-:: kf_compare.bat  -  four-way increment comparison (frozen / retrain / replay /
+:: Script\kf_compare.bat  -  four-way increment comparison (frozen / retrain / replay /
 ::                    finetune / scale) on a resistance-scaled grid
 :: =============================================================================
 ::
 :: usage
-::   double-click in repo root, or:
-::     kf_compare.bat
+::   double-click this file, or from repo root:
+::     Script\kf_compare.bat
+::   working directory is forced to the repo root
 ::
 :: prerequisites
 ::   Data/ai_mlp/best.pt + scaler.json
@@ -23,5 +24,5 @@
 ::   see Src/AI/KF/readme.md and Plan.md
 :: =============================================================================
 
-python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15 --epochs 10 --replay-n 50
+python ./../Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15 --epochs 10 --replay-n 50
 pause

@@ -1,11 +1,12 @@
 @echo off
 :: =============================================================================
-:: test.bat  -  test trained MLP-ECM on one sim trajectory
+:: Script\test.bat  -  test trained MLP-ECM on one sim trajectory
 :: =============================================================================
 ::
 :: usage
-::   double-click in repo root, or:
-::     test.bat
+::   double-click this file, or from repo root:
+::     Script\test.bat
+::   working directory is forced to the repo root
 ::
 :: prerequisites
 ::   1. weights and scaler.json under Data/ai_mlp  -- train first
@@ -42,4 +43,4 @@
 ::   see Src/AI/MLP/readme.md
 :: =============================================================================
 
-python Src/AI/MLP/test.py --show
+python ./../Src/AI/MLP/test.py --show

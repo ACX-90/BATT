@@ -1,4 +1,4 @@
-"""按 epoch 编号保存 / 查找权重。"""
+""" Check point, 按 epoch 编号保存 / 查找权重。"""
 
 from __future__ import annotations
 

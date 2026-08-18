@@ -41,6 +41,7 @@
 | `run.py` | 单条轨迹闭环 |
 | `increment.py` | 离线增量：Replay / 缩放 / 只微调 / 合集重训 |
 | `compare.py` | 四档对照：冻结 / 重训 / Replay / 微调 / 缩放 |
+| `hole.py` | 任务 B：挖掉温区、另训洞舰队、再跑四档 |
 
 ## 闭环滤波
 
@@ -91,6 +92,25 @@ python Src/AI/KF/compare.py --smoke
 ```
 
 `--make-new` 把缩放网格写到 `--new-dir`（默认 `Data/soh_k115/`），**不碰** `Data/grid/`。结果在 `Data/ai_kf/compare/compare.md`。读数与其余档做法见 [`Doc/10-合成增量对照实验.md`](../../Doc/10-合成增量对照实验.md)。整体涨阻时 `scale` 不该明显输给 `retrain`；`finetune` 旧集变差是预期失败对照。
+
+填洞（任务 B，挖掉 −10 °C）走 `hole.py`，不要对全网格舰队做增量：
+
+```powershell
+python Src/AI/KF/hole.py
+python Src/AI/KF/hole.py --split-only
+python Src/AI/KF/hole.py --compare-only
+```
+
+写出 `Data/grid_wo_tm10/`、`Data/grid_tm10/`、`Data/ai_mlp_hole/`、`Data/ai_kf/compare_hole/`。`--task hole` 只改 `compare.md` 的验收口径。读数见 [`Doc/10`](../../Doc/10-合成增量对照实验.md) §7.1：Replay / 重训为正途，缩放 \(k\) 会拆开。
+
+测量列舰队（任务 D）不要改 `config.py` 默认值：
+
+```powershell
+python Src/AI/MLP/train.py --scheme B --epochs 100 --out-dir Data/ai_mlp_meas --use-meas-inputs
+python Src/AI/KF/compare.py --task meas --mlp-dir Data/ai_mlp_meas --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_kf/compare_meas
+```
+
+读数见 `Doc/10` §7.3：底板大约 +3 mV，×1.15 仍走缩放。
 
 权重写到 `Data/ai_kf/incr/`，**不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 

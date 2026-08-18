@@ -226,7 +226,8 @@ def run_training(
                     group["lr"] = cfg.lr
 
     print(
-        f"scheme={cfg.scheme}  train={len(train_ds)}  val={len(val_ds) if val_ds else 0}  "
+        f"scheme={cfg.scheme}  inputs={'true' if cfg.use_true_inputs else 'meas'}  "
+        f"train={len(train_ds)}  val={len(val_ds) if val_ds else 0}  "
         f"device={device}  steps/traj={len(train_seq[0]['i'])}"
     )
 
@@ -317,10 +318,17 @@ def parse_args() -> tuple[TrainConfig, argparse.Namespace]:
     p.add_argument("--ckpt", default=None, help="直接指定权重文件")
     p.add_argument("--fresh", action="store_true", help="忽略已有权重，强制从头训")
     p.add_argument("--list-ckpts", action="store_true", help="列出已保存的 epoch 后退出")
+    p.add_argument(
+        "--use-meas-inputs",
+        action="store_true",
+        help="网络输入用 i_meas/soc_meas/t_meas（任务 D）。默认仍是真值列",
+    )
     args = p.parse_args()
 
     cfg = TrainConfig()
     cfg.scheme = args.scheme.upper()
+    if args.use_meas_inputs:
+        cfg.use_true_inputs = False
     if args.epochs is not None:
         cfg.epochs = args.epochs
     if args.pretrain_epochs is not None:

@@ -1,11 +1,12 @@
 @echo off
 :: =============================================================================
-:: gen_common.bat  -  one reference trajectory: Data/nmc100ah_ecm_sim.csv
+:: Script\gen_common.bat  -  one reference trajectory: Data/nmc100ah_ecm_sim.csv
 :: =============================================================================
 ::
 :: usage
-::   double-click in repo root, or:
-::     gen_common.bat
+::   double-click this file, or from repo root:
+::     Script\gen_common.bat
+::   working directory is forced to the repo root
 ::
 :: what it does
 ::   time-domain sim using SEQUENCE in nmc100ah_ecm_gen.py
@@ -40,5 +41,5 @@
 ::   see Src/Sim/readme.md
 :: =============================================================================
 
-python Src/Sim/nmc100ah_ecm_gen.py
+python ./../Src/Sim/nmc100ah_ecm_gen.py
 pause

@@ -1,11 +1,12 @@
 @echo off
 :: =============================================================================
-:: kf_run.bat  -  EKF SOC + MLP-ECM terminal voltage on one trajectory
+:: Script\kf_run.bat  -  EKF SOC + MLP-ECM terminal voltage on one trajectory
 :: =============================================================================
 ::
 :: usage
-::   double-click in repo root, or:
-::     kf_run.bat
+::   double-click this file, or from repo root:
+::     Script\kf_run.bat
+::   working directory is forced to the repo root
 ::
 :: prerequisites
 ::   1. Data/ai_mlp weights + scaler.json
@@ -23,5 +24,5 @@
 ::   see Src/AI/KF/readme.md
 :: =============================================================================
 
-python Src/AI/KF/run.py --soc-error 0.05 --current-bias 5 --show
+python ./../Src/AI/KF/run.py --soc-error 0.05 --current-bias 5 --show
 pause

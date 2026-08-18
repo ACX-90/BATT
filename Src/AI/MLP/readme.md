@@ -49,6 +49,7 @@ python Src/AI/MLP/train.py --epoch 12 --epochs 10
 python Src/AI/MLP/train.py --list-ckpts
 python Src/AI/MLP/train.py --fresh --epochs 40
 python Src/AI/MLP/train.py --scheme A --out-dir Data/ai_mlp_A
+python Src/AI/MLP/train.py --scheme B --epochs 100 --out-dir Data/ai_mlp_meas --use-meas-inputs
 ```
 
 **默认是从头训。** 每个电压 epoch 会另存 `Data/ai_mlp/ckpts/epoch_00012.pt`，同时更新 `last.pt` / `best.pt`。

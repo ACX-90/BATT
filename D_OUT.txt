@@ -1,0 +1,208 @@
+RUN python -u Src/AI/MLP/train.py --scheme B --epochs 100 --data-dir Data/grid --out-dir Data/ai_mlp_meas --use-meas-inputs
+scheme=B  inputs=meas  train=80  val=20  device=cpu  steps/traj=6200
+[pre 001/5] loss=6.3476e-01
+[pre 002/5] loss=3.6308e-01
+[pre 003/5] loss=1.0804e-01
+[pre 004/5] loss=3.8575e-02
+[pre 005/5] loss=3.0031e-02
+[001 +1/100] train RMSE=14.38 mV  val RMSE=11.21 mV  *
+[002 +2/100] train RMSE=13.70 mV  val RMSE=13.21 mV
+[003 +3/100] train RMSE=15.63 mV  val RMSE=14.01 mV
+[004 +4/100] train RMSE=15.93 mV  val RMSE=13.67 mV
+[005 +5/100] train RMSE=14.96 mV  val RMSE=12.96 mV
+[006 +6/100] train RMSE=14.84 mV  val RMSE=12.25 mV
+[007 +7/100] train RMSE=13.93 mV  val RMSE=11.73 mV
+[008 +8/100] train RMSE=13.47 mV  val RMSE=11.35 mV
+[009 +9/100] train RMSE=13.52 mV  val RMSE=11.16 mV  *
+[010 +10/100] train RMSE=12.88 mV  val RMSE=11.02 mV  *
+[011 +11/100] train RMSE=12.46 mV  val RMSE=10.93 mV  *
+[012 +12/100] train RMSE=12.57 mV  val RMSE=10.85 mV  *
+[013 +13/100] train RMSE=12.51 mV  val RMSE=10.78 mV  *
+[014 +14/100] train RMSE=12.35 mV  val RMSE=10.70 mV  *
+[015 +15/100] train RMSE=12.44 mV  val RMSE=10.64 mV  *
+[016 +16/100] train RMSE=12.55 mV  val RMSE=10.57 mV  *
+[017 +17/100] train RMSE=12.28 mV  val RMSE=10.48 mV  *
+[018 +18/100] train RMSE=12.25 mV  val RMSE=10.41 mV  *
+[019 +19/100] train RMSE=12.19 mV  val RMSE=10.35 mV  *
+[020 +20/100] train RMSE=11.91 mV  val RMSE=10.30 mV  *
+[021 +21/100] train RMSE=11.96 mV  val RMSE=10.23 mV  *
+[022 +22/100] train RMSE=11.73 mV  val RMSE=10.17 mV  *
+[023 +23/100] train RMSE=11.62 mV  val RMSE=10.12 mV  *
+[024 +24/100] train RMSE=11.73 mV  val RMSE=10.06 mV  *
+[025 +25/100] train RMSE=11.92 mV  val RMSE=10.01 mV  *
+[026 +26/100] train RMSE=11.74 mV  val RMSE=9.96 mV  *
+[027 +27/100] train RMSE=11.34 mV  val RMSE=9.91 mV  *
+[028 +28/100] train RMSE=11.38 mV  val RMSE=9.86 mV  *
+[029 +29/100] train RMSE=11.94 mV  val RMSE=9.81 mV  *
+[030 +30/100] train RMSE=11.71 mV  val RMSE=9.76 mV  *
+[031 +31/100] train RMSE=11.63 mV  val RMSE=9.71 mV  *
+[032 +32/100] train RMSE=11.27 mV  val RMSE=9.67 mV  *
+[033 +33/100] train RMSE=11.61 mV  val RMSE=9.62 mV  *
+[034 +34/100] train RMSE=11.30 mV  val RMSE=9.57 mV  *
+[035 +35/100] train RMSE=11.41 mV  val RMSE=9.53 mV  *
+[036 +36/100] train RMSE=11.25 mV  val RMSE=9.50 mV  *
+[037 +37/100] train RMSE=11.46 mV  val RMSE=9.45 mV  *
+[038 +38/100] train RMSE=11.38 mV  val RMSE=9.41 mV  *
+[039 +39/100] train RMSE=11.43 mV  val RMSE=9.36 mV  *
+[040 +40/100] train RMSE=11.24 mV  val RMSE=9.32 mV  *
+[041 +41/100] train RMSE=10.99 mV  val RMSE=9.27 mV  *
+[042 +42/100] train RMSE=11.25 mV  val RMSE=9.24 mV  *
+[043 +43/100] train RMSE=11.47 mV  val RMSE=9.18 mV  *
+[044 +44/100] train RMSE=11.00 mV  val RMSE=9.15 mV  *
+[045 +45/100] train RMSE=11.05 mV  val RMSE=9.10 mV  *
+[046 +46/100] train RMSE=11.10 mV  val RMSE=9.07 mV  *
+[047 +47/100] train RMSE=11.29 mV  val RMSE=9.02 mV  *
+[048 +48/100] train RMSE=10.96 mV  val RMSE=8.99 mV  *
+[049 +49/100] train RMSE=10.82 mV  val RMSE=8.95 mV  *
+[050 +50/100] train RMSE=11.06 mV  val RMSE=8.92 mV  *
+[051 +51/100] train RMSE=11.09 mV  val RMSE=8.86 mV  *
+[052 +52/100] train RMSE=10.96 mV  val RMSE=8.83 mV  *
+[053 +53/100] train RMSE=10.69 mV  val RMSE=8.79 mV  *
+[054 +54/100] train RMSE=10.66 mV  val RMSE=8.76 mV  *
+[055 +55/100] train RMSE=10.38 mV  val RMSE=8.72 mV  *
+[056 +56/100] train RMSE=10.37 mV  val RMSE=8.68 mV  *
+[057 +57/100] train RMSE=10.85 mV  val RMSE=8.65 mV  *
+[058 +58/100] train RMSE=10.65 mV  val RMSE=8.62 mV  *
+[059 +59/100] train RMSE=10.80 mV  val RMSE=8.59 mV  *
+[060 +60/100] train RMSE=10.44 mV  val RMSE=8.56 mV  *
+[061 +61/100] train RMSE=10.53 mV  val RMSE=8.51 mV  *
+[062 +62/100] train RMSE=10.57 mV  val RMSE=8.48 mV  *
+[063 +63/100] train RMSE=10.09 mV  val RMSE=8.44 mV  *
+[064 +64/100] train RMSE=10.35 mV  val RMSE=8.41 mV  *
+[065 +65/100] train RMSE=10.50 mV  val RMSE=8.38 mV  *
+[066 +66/100] train RMSE=10.32 mV  val RMSE=8.35 mV  *
+[067 +67/100] train RMSE=10.46 mV  val RMSE=8.32 mV  *
+[068 +68/100] train RMSE=10.30 mV  val RMSE=8.29 mV  *
+[069 +69/100] train RMSE=10.39 mV  val RMSE=8.26 mV  *
+[070 +70/100] train RMSE=10.19 mV  val RMSE=8.23 mV  *
+[071 +71/100] train RMSE=10.19 mV  val RMSE=8.19 mV  *
+[072 +72/100] train RMSE=10.02 mV  val RMSE=8.16 mV  *
+[073 +73/100] train RMSE=10.00 mV  val RMSE=8.14 mV  *
+[074 +74/100] train RMSE=10.38 mV  val RMSE=8.11 mV  *
+[075 +75/100] train RMSE=9.67 mV  val RMSE=8.08 mV  *
+[076 +76/100] train RMSE=10.16 mV  val RMSE=8.06 mV  *
+[077 +77/100] train RMSE=10.03 mV  val RMSE=8.03 mV  *
+[078 +78/100] train RMSE=9.86 mV  val RMSE=8.02 mV  *
+[079 +79/100] train RMSE=10.17 mV  val RMSE=7.99 mV  *
+[080 +80/100] train RMSE=9.80 mV  val RMSE=7.95 mV  *
+[081 +81/100] train RMSE=9.72 mV  val RMSE=7.94 mV  *
+[082 +82/100] train RMSE=10.00 mV  val RMSE=7.92 mV  *
+[083 +83/100] train RMSE=9.96 mV  val RMSE=7.89 mV  *
+[084 +84/100] train RMSE=10.00 mV  val RMSE=7.86 mV  *
+[085 +85/100] train RMSE=9.64 mV  val RMSE=7.86 mV  *
+[086 +86/100] train RMSE=9.95 mV  val RMSE=7.85 mV  *
+[087 +87/100] train RMSE=10.16 mV  val RMSE=7.80 mV  *
+[088 +88/100] train RMSE=9.66 mV  val RMSE=7.78 mV  *
+[089 +89/100] train RMSE=9.86 mV  val RMSE=7.76 mV  *
+[090 +90/100] train RMSE=9.89 mV  val RMSE=7.76 mV  *
+[091 +91/100] train RMSE=9.62 mV  val RMSE=7.73 mV  *
+[092 +92/100] train RMSE=9.82 mV  val RMSE=7.72 mV  *
+[093 +93/100] train RMSE=9.23 mV  val RMSE=7.67 mV  *
+[094 +94/100] train RMSE=9.50 mV  val RMSE=7.66 mV  *
+[095 +95/100] train RMSE=9.64 mV  val RMSE=7.64 mV  *
+[096 +96/100] train RMSE=9.60 mV  val RMSE=7.63 mV  *
+[097 +97/100] train RMSE=9.72 mV  val RMSE=7.62 mV  *
+[098 +98/100] train RMSE=9.58 mV  val RMSE=7.62 mV
+[099 +99/100] train RMSE=9.53 mV  val RMSE=7.59 mV  *
+[100 +100/100] train RMSE=9.72 mV  val RMSE=7.57 mV  *
+已保存 C:\Users\pyx private\Desktop\BATT\Data\ai_mlp_meas\best.pt  (best val RMSE=7.57 mV  累计电压 epoch=100)
+已保存 epoch: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100  (最新 100)
+RUN python -u Src/AI/KF/compare.py --task meas --mlp-dir Data/ai_mlp_meas --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_kf/compare_meas --epochs 10 --replay-n 50
+
+======== frozen  不更新，冻结权重直接推理（基线） ========
+增量 mode=finetune  ckpt=best.pt  new=25 (train 20 / val 5)  train_old=0  eval_old=100  new_in=meas  old_in=meas  scaler 已冻结
+旧参考点 (50%, 25°C, 1C)  R0=0.7869 mΩ  R1=0.6258 mΩ
+增量前  新轨迹 RMSE=26.10 mV
+增量前  旧回放 RMSE=7.77 mV
+
+======== retrain  旧网格 + 新年份合集，从旧权重接着训（冻 scaler） ========
+增量 mode=retrain  ckpt=best.pt  new=25 (train 20 / val 5)  train_old=100  eval_old=100  new_in=meas  old_in=meas  scaler 已冻结
+旧参考点 (50%, 25°C, 1C)  R0=0.7869 mΩ  R1=0.6258 mΩ
+增量前  新轨迹 RMSE=26.10 mV
+增量前  旧回放 RMSE=7.77 mV
+[001/10] train=12.89 mV  new=24.91 mV  old=8.53 mV  *
+[002/10] train=12.44 mV  new=21.83 mV  old=8.66 mV  *
+[003/10] train=12.60 mV  new=25.65 mV  old=8.11 mV
+[004/10] train=12.35 mV  new=24.31 mV  old=8.04 mV
+[005/10] train=11.95 mV  new=24.45 mV  old=8.19 mV
+[006/10] train=12.57 mV  new=24.12 mV  old=8.07 mV
+[007/10] train=12.09 mV  new=24.81 mV  old=7.90 mV
+[008/10] train=11.93 mV  new=22.37 mV  old=8.30 mV
+[009/10] train=12.32 mV  new=24.08 mV  old=7.94 mV
+[010/10] train=12.22 mV  new=24.55 mV  old=7.79 mV
+新参考点  R0=0.7829 mΩ (-0.50%)  R1=0.6158 mΩ (-1.59%)
+已保存 C:\Users\pyx private\Desktop\BATT\Data\ai_kf\compare_meas\retrain\best.pt  (未覆盖 C:\Users\pyx private\Desktop\BATT\Data\ai_mlp_meas\best.pt)
+
+======== replay  新年份 + 旧轨迹回放混批 ========
+增量 mode=replay  ckpt=best.pt  new=25 (train 20 / val 5)  train_old=50  eval_old=100  new_in=meas  old_in=meas  scaler 已冻结
+旧参考点 (50%, 25°C, 1C)  R0=0.7869 mΩ  R1=0.6258 mΩ
+增量前  新轨迹 RMSE=26.10 mV
+增量前  旧回放 RMSE=7.77 mV
+[001/10] train=12.99 mV  new=17.47 mV  old=13.51 mV  *
+[002/10] train=12.38 mV  new=25.26 mV  old=10.53 mV
+[003/10] train=12.36 mV  new=26.38 mV  old=11.23 mV
+[004/10] train=11.71 mV  new=23.84 mV  old=11.43 mV
+[005/10] train=11.36 mV  new=26.40 mV  old=10.04 mV
+[006/10] train=11.74 mV  new=20.82 mV  old=11.67 mV
+[007/10] train=11.08 mV  new=21.64 mV  old=10.73 mV
+[008/10] train=10.79 mV  new=20.38 mV  old=11.62 mV
+[009/10] train=10.90 mV  new=22.02 mV  old=10.98 mV
+[010/10] train=10.78 mV  new=23.14 mV  old=10.38 mV
+新参考点  R0=0.7935 mΩ (+0.85%)  R1=0.6186 mΩ (-1.15%)
+已保存 C:\Users\pyx private\Desktop\BATT\Data\ai_kf\compare_meas\replay\best.pt  (未覆盖 C:\Users\pyx private\Desktop\BATT\Data\ai_mlp_meas\best.pt)
+
+======== finetune  只扫新年份，旧温区容易忘 ========
+增量 mode=finetune  ckpt=best.pt  new=25 (train 20 / val 5)  train_old=0  eval_old=100  new_in=meas  old_in=meas  scaler 已冻结
+旧参考点 (50%, 25°C, 1C)  R0=0.7869 mΩ  R1=0.6258 mΩ
+增量前  新轨迹 RMSE=26.10 mV
+增量前  旧回放 RMSE=7.77 mV
+[001/10] train=19.01 mV  new=16.94 mV  old=11.47 mV  *
+[002/10] train=14.60 mV  new=10.36 mV  old=16.71 mV  *
+[003/10] train=13.01 mV  new=8.45 mV  old=21.14 mV
+[004/10] train=15.23 mV  new=8.74 mV  old=23.40 mV
+[005/10] train=12.92 mV  new=9.48 mV  old=22.74 mV
+[006/10] train=12.19 mV  new=12.01 mV  old=20.79 mV
+[007/10] train=10.70 mV  new=15.14 mV  old=19.06 mV
+[008/10] train=12.55 mV  new=17.59 mV  old=17.99 mV
+[009/10] train=10.97 mV  new=19.87 mV  old=17.04 mV
+[010/10] train=10.93 mV  new=20.18 mV  old=17.14 mV
+新参考点  R0=0.8695 mΩ (+10.50%)  R1=0.7353 mΩ (+17.51%)
+已保存 C:\Users\pyx private\Desktop\BATT\Data\ai_kf\compare_meas\finetune\best.pt  (未覆盖 C:\Users\pyx private\Desktop\BATT\Data\ai_mlp_meas\best.pt)
+
+======== scale  冻 MLP，只学 k0 k1（整体涨阻正途） ========
+增量 mode=scale  ckpt=best.pt  new=25 (train 20 / val 5)  train_old=0  eval_old=100  new_in=meas  old_in=meas  scaler 已冻结
+旧参考点 (50%, 25°C, 1C)  R0=0.7869 mΩ  R1=0.6258 mΩ
+增量前  新轨迹 RMSE=26.10 mV
+增量前  旧回放 RMSE=7.77 mV
+[001/10] train=19.58 mV  new=22.52 mV  old=8.88 mV  k0=1.0284 k1=1.0260  *
+[002/10] train=17.82 mV  new=19.24 mV  old=10.80 mV  k0=1.0560 k1=1.0501  *
+[003/10] train=18.53 mV  new=16.09 mV  old=13.10 mV  k0=1.0837 k1=1.0751  *
+[004/10] train=17.72 mV  new=13.21 mV  old=15.56 mV  k0=1.1109 k1=1.1005  *
+[005/10] train=15.27 mV  new=10.85 mV  old=18.06 mV  k0=1.1370 k1=1.1260
+[006/10] train=12.67 mV  new=9.41 mV  old=20.29 mV  k0=1.1592 k1=1.1485
+[007/10] train=11.86 mV  new=8.83 mV  old=22.13 mV  k0=1.1762 k1=1.1680
+[008/10] train=14.72 mV  new=8.76 mV  old=23.39 mV  k0=1.1864 k1=1.1828
+[009/10] train=12.50 mV  new=8.77 mV  old=23.87 mV  k0=1.1887 k1=1.1908
+[010/10] train=12.22 mV  new=8.71 mV  old=23.89 mV  k0=1.1858 k1=1.1953
+新参考点  R0=0.9331 mΩ (+18.58%)  R1=0.7480 mΩ (+19.53%)
+已保存 C:\Users\pyx private\Desktop\BATT\Data\ai_kf\compare_meas\scale\best.pt  (未覆盖 C:\Users\pyx private\Desktop\BATT\Data\ai_mlp_meas\best.pt)
+
+对照表  C:\Users\pyx private\Desktop\BATT\Data\ai_kf\compare_meas\compare.csv
+# 增量四档对照
+
+| 档 | 新 RMSE 前→后 / mV | 旧 RMSE 前→后 / mV | 旧集变化 | 参考点 R0 | 参考点 R1 | k0 / k1 |
+|----|---------------------|---------------------|----------|-----------|-----------|---------|
+| `frozen` | 26.10 → 26.10 | 7.77 → 7.77 | +0.0% | 0.7869→0.7869 (+0.0%) | 0.6258→0.6258 (+0.0%) | — |
+| `retrain` | 26.10 → 24.55 | 7.77 → 7.79 | +0.2% | 0.7869→0.7829 (-0.5%) | 0.6258→0.6158 (-1.6%) | — |
+| `replay` | 26.10 → 23.14 | 7.77 → 10.38 | +33.6% | 0.7869→0.7935 (+0.8%) | 0.6258→0.6186 (-1.2%) | — |
+| `finetune` | 26.10 → 20.18 | 7.77 → 17.14 | +120.4% | 0.7869→0.8695 (+10.5%) | 0.6258→0.7353 (+17.5%) | — |
+| `scale` | 26.10 → 8.71 | 7.77 → 23.89 | +207.3% | 0.7869→0.9331 (+18.6%) | 0.6258→0.7480 (+19.5%) | 1.186 / 1.195 |
+
+通过口径（测量列舰队 / `Doc/10` 任务 D）：
+
+- 对照任务 A 同一张 ×1.15 表；冻结新/旧相对 A 各抬多少，才是输入域差
+- 涨阻结论应仍是缩放；这几个毫伏不该推翻 k 为正途
+- 若冻结旧集已到和 A 新年份一个量级，先查列有没有用反
+- 表是最后一轮，不是 `best.pt`
+
+

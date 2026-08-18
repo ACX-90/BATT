@@ -134,7 +134,7 @@ C = C^{\mathrm{BOL}}\cdot\bigl(1+a_C(1-q)\bigr),\ a_C<0
 6. 仿真加可关的 \(q\) 因子 + 可选 2RC 离散。BOL 1RC 网格不变。写出 `Data/soh_q90/`、`Data/rc2/`。
 7. 用 \(q<1\)（1RC）重跑四档，得到缺维遗忘的数字；用 2RC、\(q=1\) 画 \(e^{\mathrm{ol}}\) 回弹（Q4）。
 
-交付：已写入 [`Doc/10-合成增量对照实验.md`](Doc/10-合成增量对照实验.md)（电阻 ×1.15，缩放为正途）。电压 RMSE 单独下降不能结题。填洞对照尚未跑。
+交付：已写入 [`Doc/10-合成增量对照实验.md`](Doc/10-合成增量对照实验.md)（A 缩放、B Replay、C 冻结；D 测量列未推翻缩放。A 的 4 mV 是 10×10 训 500+ 轮，B/D 的 100 轮约 8 mV 是没训满）。电压 RMSE 单独下降不能结题。\(\delta R_0\) 与小时级负例尚未跑。
 
 ### 第 1 期 — 小实现（有第 0 期数字之后）
 
@@ -215,6 +215,7 @@ C = C^{\mathrm{BOL}}\cdot\bigl(1+a_C(1-q)\bigr),\ a_C<0
 | `Doc/07` `Doc/08` | 残差头、包级、10 mV 规则 |
 | `Doc/09` | 不换骨干；滑窗是协议 |
 | `Src/AI/KF/increment.py` | Replay / 缩放 / 微调 |
+| `Src/AI/KF/hole.py` | 任务 B 填洞：拆网格 + 洞舰队 + 四档 |
 | `Src/AI/KF/gate.py` | 增量门控 |
 | `Src/Sim/nmc100ah_ecm*.py` | 生成器；2RC / SOH 只加在这里 |
 

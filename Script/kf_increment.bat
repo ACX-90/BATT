@@ -1,11 +1,12 @@
 @echo off
 :: =============================================================================
-:: kf_increment.bat  -  offline incremental MLP (open-loop voltage, frozen scaler)
+:: Script\kf_increment.bat  -  offline incremental MLP (open-loop voltage, frozen scaler)
 :: =============================================================================
 ::
 :: usage
-::   double-click in repo root, or:
-::     kf_increment.bat
+::   double-click this file, or from repo root:
+::     Script\kf_increment.bat
+::   working directory is forced to the repo root
 ::
 :: prerequisites
 ::   1. trained Data/ai_mlp  (scaler.json must stay)
@@ -23,5 +24,5 @@
 ::   see Src/AI/KF/readme.md
 :: =============================================================================
 
-python Src/AI/KF/increment.py --mode replay --new-dir Data/ai_kf/logs --replay-dir Data/grid --epochs 10
+python ./../Src/AI/KF/increment.py --mode replay --new-dir Data/ai_kf/logs --replay-dir Data/grid --epochs 10
 pause

@@ -301,12 +301,14 @@ def run_increment(args: argparse.Namespace) -> Path:
         weight=1.0,
         style=args.new_style,
     )
+    # 旧集跟舰队训练时的输入列：真值舰队仍吃真值（A/B/C 不变）；测量列舰队吃测量列
+    old_true = bool(cfg.use_true_inputs)
     train_old_seq: list[dict] = []
     if args.mode in {"replay", "retrain"} and args.replay_dir:
         train_old_seq = load_incr_sequences(
             _resolve(args.replay_dir),
             pattern=args.replay_glob,
-            use_true_inputs=True,
+            use_true_inputs=old_true,
             weight=args.beta,
             style="grid",
         )
@@ -321,7 +323,7 @@ def run_increment(args: argparse.Namespace) -> Path:
         eval_old_seq = load_incr_sequences(
             _resolve(eval_old_dir),
             pattern=args.replay_glob,
-            use_true_inputs=True,
+            use_true_inputs=old_true,
             weight=1.0,
             style="grid",
         )
@@ -335,7 +337,9 @@ def run_increment(args: argparse.Namespace) -> Path:
     print(
         f"增量 mode={args.mode}  ckpt={ckpt.name}  "
         f"new={len(new_seq)} (train {len(new_train)} / val {len(new_val)})  "
-        f"train_old={len(train_old_seq)}  eval_old={len(eval_old_seq)}  scaler 已冻结"
+        f"train_old={len(train_old_seq)}  eval_old={len(eval_old_seq)}  "
+        f"new_in={'true' if args.use_true_inputs else 'meas'}  "
+        f"old_in={'true' if old_true else 'meas'}  scaler 已冻结"
     )
     r0_b, r1_b = ref_params(model, scaler)
     print(f"旧参考点 (50%, 25°C, 1C)  R0={r0_b*1e3:.4f} mΩ  R1={r1_b*1e3:.4f} mΩ")
