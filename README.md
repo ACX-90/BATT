@@ -175,6 +175,8 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Script/kf_meas.bat`](Script/kf_meas.bat) | 测量列舰队 + ×1.15 四档 | `train.py --use-meas-inputs` 再 `compare.py --task meas` |
 | [`Script/kf_dr0.bat`](Script/kf_dr0.bat) | \(\delta R_0\)：MLP \(R_0\) ×1.2，开关对照 | `run.py --best --r0-scale 1.2` 与 `--dr0` |
 | [`Script/kf_neg.bat`](Script/kf_neg.bat) | 小时级负例 + 门控 | `nmc100ah_ecm_gen_long.py` 再 `run.py` |
+| [`Script/kf_q90.bat`](Script/kf_q90.bat) | \(q=0.90\) 网格 + 四档 | `gen_grid --soh 0.90` 再 `compare.py` |
+| [`Script/kf_rc2.bat`](Script/kf_rc2.bat) | 2RC 真值、1RC 滤波 | `gen.py --rc2` 再 `run.py` |
 | [`autogit.bat`](autogit.bat) | `pull` → `add *` → `commit` → `push` | 见文件内四行 git |
 | [`clean.bat`](clean.bat) | 删掉 `.gitignore` 匹配的文件（先确认 Y） | `git clean -fdX` |
 

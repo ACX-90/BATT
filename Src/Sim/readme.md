@@ -89,6 +89,15 @@ run_sim(out="Data/long/cc_rest.csv", sequence=my_seq, soc0=0.70)
 
 小时级负例（任务 F）走 `nmc100ah_ecm_gen_long.py`，默认网格工况不变。
 
+寿命因子与 2RC（仿真比 BMS 更真，BMS 仍读 1RC）：
+
+```powershell
+python Src/Sim/nmc100ah_ecm_gen_grid.py --out-dir Data/soh_q90 --soh 0.90
+python Src/Sim/nmc100ah_ecm_gen.py --out Data/rc2/common.csv --rc2
+```
+
+`--soh 0.90` 只改 \(R,C\)（\(a_0=1,a_1=1.5,a_C=-0.3\)），OCV 和容量默认不动。`--rc2` 叠加 \(\tau_2=90\,\mathrm{s}\)、\(R_2\approx 0.43\,R_1\)。两个开关可分开。不要写回 `Data/grid/`。
+
 默认写出 `Data/nmc100ah_ecm_sim.csv`。前几行是 `#` 元数据，pandas 读取时加 `comment="#"`。
 
 主要列：`time_s, mode, i_true_a, i_meas_a, t_true_c, soc_true, u_ocv_v, r0_ohm, r1_ohm, c1_f, tau1_s, u_p_v, u_t_true_v, u_t_meas_v`。

@@ -128,7 +128,18 @@ python Src/Sim/nmc100ah_ecm_gen_long.py
 python Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv
 ```
 
-读数见 `Doc/04` §7.5。健康长恒流门控拒；零偏 / 容量错 NIS 仍健康，过了也不许拆 \(R\)。
+读数见 `Doc/04-a` §7.5。健康长恒流门控拒；零偏 / 容量错 NIS 仍健康，过了也不许拆 \(R\)。
+
+\(q=0.90\) 与 2RC（生成器升级，BMS 仍 1RC）：
+
+```powershell
+python Src/Sim/nmc100ah_ecm_gen_grid.py --out-dir Data/soh_q90 --soh 0.90
+python Src/AI/KF/compare.py --task aging --new-dir Data/soh_q90 --out-dir Data/ai_kf/compare_q90
+python Src/Sim/nmc100ah_ecm_gen.py --out Data/rc2/common.csv --rc2
+python Src/AI/KF/run.py --best --csv Data/rc2/common.csv
+```
+
+读数见 `Doc/04-a` §7.6–§7.7。不要用 2RC 电压去增量 1RC MLP。
 
 权重写到 `Data/ai_kf/incr/`，**不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 

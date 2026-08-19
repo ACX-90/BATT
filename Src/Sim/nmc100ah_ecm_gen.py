@@ -88,7 +88,15 @@ REPO_ROOT = SIM_DIR.parent.parent
 if str(SIM_DIR) not in sys.path:
     sys.path.insert(0, str(SIM_DIR))
 
-from nmc100ah_ecm import NMC100AhECM  # noqa: E402
+from nmc100ah_ecm import (  # noqa: E402
+    NMC100AhECM,
+    make_ecm,
+    R2_OVER_R1,
+    TAU2_S,
+    SOH_A0,
+    SOH_A1,
+    SOH_AC,
+)
 
 # 典型 100 Ah NMC/石墨 OCV 表（25 °C），用于电压仿真
 _OCV_SOC = np.array(
@@ -212,11 +220,16 @@ def simulate(
     noise_seed: int = NOISE_SEED,
     noise_std: dict[str, float] | None = None,
     enable_cutoff: bool = ENABLE_CUTOFF,
+    rc2: bool | None = None,
+    u_p2_0: float = 0.0,
 ) -> dict[str, np.ndarray]:
     cell = model.params.cell
     lim = model.params.validity
     noise_std = dict(NOISE_STD if noise_std is None else noise_std)
     rng = np.random.default_rng(noise_seed)
+    use_rc2 = bool(getattr(model, "rc2", False) if rc2 is None else rc2)
+    soh = float(getattr(model, "q", 1.0))
+    write_soh = abs(soh - 1.0) > 1e-12 or use_rc2
 
     plan = expand_sequence(
         sequence, dt_s=dt_s, capacity_ah=cell.capacity_ah, t_default=t_ambient_c
@@ -224,11 +237,17 @@ def simulate(
     n = len(plan)
     q_as = cell.capacity_ah * 3600.0
 
-    out = {name: np.empty(n, dtype=float) for name in CSV_COLUMNS if name != "mode"}
+    extra = []
+    if use_rc2:
+        extra.extend(["r2_ohm", "c2_f", "tau2_s", "u_p2_v"])
+    if write_soh:
+        extra.append("soh")
+    out = {name: np.empty(n, dtype=float) for name in CSV_COLUMNS + extra if name != "mode"}
     modes = np.empty(n, dtype=object)
 
     soc = float(soc0)
     u_p = float(u_p0)
+    u_p2 = float(u_p2_0)
     cutoff_cmd: int | None = None
 
     for k, (cmd_id, mode, i_cmd, t_cmd) in enumerate(plan):
@@ -244,8 +263,19 @@ def simulate(
 
         alpha = math.exp(-dt_s / tau1)
         u_p_next = alpha * u_p + r1 * (1.0 - alpha) * i_a
+        r2 = c2 = tau2 = 0.0
+        u_p2_next = 0.0
+        if use_rc2:
+            if hasattr(model, "rc2_from_r1"):
+                r2, c2, tau2 = model.rc2_from_r1(r1)
+            else:
+                r2 = R2_OVER_R1 * r1
+                tau2 = TAU2_S
+                c2 = tau2 / max(r2, 1e-12)
+            alpha2 = math.exp(-dt_s / tau2)
+            u_p2_next = alpha2 * u_p2 + r2 * (1.0 - alpha2) * i_a
         u_ocv = ocv_nmc(soc, t_cmd)
-        u_t = u_ocv - i_a * r0 - u_p_next
+        u_t = u_ocv - i_a * r0 - u_p_next - (u_p2_next if use_rc2 else 0.0)
 
         hit = False
         if enable_cutoff and i_a != 0.0:
@@ -262,9 +292,20 @@ def simulate(
             tau1 = r1 * c1
             alpha = math.exp(-dt_s / tau1)
             u_p_next = alpha * u_p
-            u_t = u_ocv - u_p_next
+            if use_rc2:
+                if hasattr(model, "rc2_from_r1"):
+                    r2, c2, tau2 = model.rc2_from_r1(r1)
+                else:
+                    r2 = R2_OVER_R1 * r1
+                    tau2 = TAU2_S
+                    c2 = tau2 / max(r2, 1e-12)
+                alpha2 = math.exp(-dt_s / tau2)
+                u_p2_next = alpha2 * u_p2
+            u_t = u_ocv - u_p_next - (u_p2_next if use_rc2 else 0.0)
 
         u_p = u_p_next
+        if use_rc2:
+            u_p2 = u_p2_next
 
         soc = float(np.clip(soc - i_a * dt_s / q_as, 0.0, 1.0))
 
@@ -294,6 +335,13 @@ def simulate(
         out["u_p_v"][k] = u_p
         out["u_t_true_v"][k] = u_t
         out["u_t_meas_v"][k] = u_meas
+        if use_rc2:
+            out["r2_ohm"][k] = r2
+            out["c2_f"][k] = c2
+            out["tau2_s"][k] = tau2
+            out["u_p2_v"][k] = u_p2
+        if write_soh:
+            out["soh"][k] = soh
         modes[k] = mode_k
 
     out["mode"] = modes
@@ -339,11 +387,13 @@ def write_csv(
     with path.open("w", encoding="utf-8", newline="") as fh:
         for line in meta:
             fh.write(line + "\n")
+        extra = [k for k in ("r2_ohm", "c2_f", "tau2_s", "u_p2_v", "soh") if k in data]
+        cols = CSV_COLUMNS + extra
         writer = csv.writer(fh)
-        writer.writerow(CSV_COLUMNS)
+        writer.writerow(cols)
         for k in range(n):
             row = []
-            for name in CSV_COLUMNS:
+            for name in cols:
                 val = data[name][k]
                 if name == "mode":
                     row.append(val)
@@ -370,6 +420,15 @@ def run_sim(
     extra_meta: list[str] | None = None,
     model: NMC100AhECM | None = None,
     summarize: bool = True,
+    soh: float = 1.0,
+    soh_a0: float = SOH_A0,
+    soh_a1: float = SOH_A1,
+    soh_ac: float = SOH_AC,
+    soh_capacity: float = 1.0,
+    rc2: bool = False,
+    r0_scale: float = 1.0,
+    r1_scale: float = 1.0,
+    c1_scale: float = 1.0,
 ) -> Path:
     """跑一条轨迹并写 CSV。sequence / soc0 等为 None 时用本文件头部默认，不改默认网格。"""
     seq = SEQUENCE if sequence is None else list(sequence)
@@ -383,10 +442,34 @@ def run_sim(
     seed = NOISE_SEED if noise_seed is None else int(noise_seed)
     std = dict(NOISE_STD if noise_std is None else noise_std)
     cut = ENABLE_CUTOFF if enable_cutoff is None else bool(enable_cutoff)
-    cell = NMC100AhECM() if model is None else model
+    if model is None:
+        model = make_ecm(
+            r0_scale=r0_scale,
+            r1_scale=r1_scale,
+            c1_scale=c1_scale,
+            soh=soh,
+            soh_a0=soh_a0,
+            soh_a1=soh_a1,
+            soh_ac=soh_ac,
+            soh_capacity=soh_capacity,
+            rc2=rc2,
+        )
+    meta = list(extra_meta or [])
+    if hasattr(model, "meta"):
+        blob = model.meta()
+        meta.extend(
+            [
+                "# schema_version=1.1.0",
+                f"# soh={blob.get('soh', 1.0)}",
+                f"# soh_capacity={blob.get('soh_capacity', 1.0)}",
+                f"# rc2={int(bool(blob.get('rc2', False)))}",
+            ]
+        )
+    elif rc2 or abs(soh - 1.0) > 1e-12:
+        meta.extend([f"# schema_version=1.1.0", f"# soh={soh}", f"# rc2={int(rc2)}"])
 
     data = simulate(
-        cell,
+        model,
         seq,
         dt_s=dt,
         soc0=s0,
@@ -396,6 +479,7 @@ def run_sim(
         noise_seed=seed,
         noise_std=std,
         enable_cutoff=cut,
+        rc2=rc2,
     )
     path = write_csv(
         out,
@@ -406,7 +490,7 @@ def run_sim(
         noise_seed=seed,
         noise_std=std,
         sequence=seq,
-        extra_meta=extra_meta,
+        extra_meta=meta,
     )
     print(f"已写出 {path}")
     if summarize:
@@ -439,6 +523,8 @@ def main() -> None:
     parser.add_argument("--t-ambient", type=float, default=None, help="覆盖头部环境温度 / °C")
     parser.add_argument("--seed", type=int, default=None, help="覆盖头部 NOISE_SEED")
     parser.add_argument("--no-noise", action="store_true", help="关闭噪声")
+    parser.add_argument("--soh", type=float, default=1.0, help="电阻/电容寿命因子 q，1=BOL")
+    parser.add_argument("--rc2", action="store_true", help="叠加慢支路 R2C2，BMS 仍读 1RC")
     args = parser.parse_args()
 
     run_sim(
@@ -447,6 +533,8 @@ def main() -> None:
         t_ambient_c=args.t_ambient,
         noise_enable=False if args.no_noise else None,
         noise_seed=args.seed,
+        soh=args.soh,
+        rc2=args.rc2,
     )
 
 

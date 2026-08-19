@@ -35,7 +35,7 @@ from MLP.config import REPO_ROOT
 from MLP.dataset import _load_csv
 from MLP.infer import infer_csv, load_bundle
 
-from _common import apply_style, mode_spans, save_figure
+from _common import apply_style, mode_spans, plot_overlay, save_figure
 
 MODE_FACE = {
     "rest": (0.72, 0.72, 0.72, 0.18),
@@ -147,8 +147,8 @@ def plot_test(
     fig.suptitle(title, fontsize=13)
     _shade_modes(axes, t, modes)
 
-    axes[0].plot(t, data["u_t_meas_v"], color="#e08a7a", lw=0.7, alpha=0.85, label="测量 $U_t$")
-    axes[0].plot(t, data["u_t_hat_v"], color="#9c2a2a", lw=1.15, label="预测 $U_t$")
+    plot_overlay(axes[0], t, data["u_t_meas_v"], "meas", color="#e57373", label="测量 $U_t$")
+    plot_overlay(axes[0], t, data["u_t_hat_v"], "ol", color="#b71c1c", label="预测 $U_t$")
     axes[0].set_ylabel("电压 / V")
     axes[0].legend(loc="upper right", ncol=2)
     axes[0].set_title(
@@ -163,8 +163,8 @@ def plot_test(
     axes[1].plot(t, data["u_err_v"] * 1e3, color="#4e342e", lw=0.85)
     axes[1].set_ylabel("电压误差 / mV")
 
-    axes[2].plot(t, data["r0_ohm"] * 1e3, color="#90caf9", lw=0.9, label="真值 $R_0$")
-    axes[2].plot(t, data["r0_hat_ohm"] * 1e3, color="#1565c0", lw=1.15, label="预测 $R_0$")
+    plot_overlay(axes[2], t, data["r0_ohm"] * 1e3, "truth", color="#90caf9", label="真值 $R_0$")
+    plot_overlay(axes[2], t, data["r0_hat_ohm"] * 1e3, "est", color="#0d47a1", label="预测 $R_0$")
     axes[2].set_ylabel("$R_0$ / mΩ")
     axes[2].legend(loc="upper right", ncol=2)
     if "r0_rmse_mohm" in stats:
@@ -174,8 +174,8 @@ def plot_test(
             fontsize=9,
         )
 
-    axes[3].plot(t, data["r1_ohm"] * 1e3, color="#ffcc80", lw=0.9, label="真值 $R_1$")
-    axes[3].plot(t, data["r1_hat_ohm"] * 1e3, color="#ef6c00", lw=1.15, label="预测 $R_1$")
+    plot_overlay(axes[3], t, data["r1_ohm"] * 1e3, "truth", color="#ffcc80", label="真值 $R_1$")
+    plot_overlay(axes[3], t, data["r1_hat_ohm"] * 1e3, "est", color="#e65100", label="预测 $R_1$")
     axes[3].set_ylabel("$R_1$ / mΩ")
     axes[3].set_xlabel("时间 / s")
     axes[3].legend(loc="upper right", ncol=2)

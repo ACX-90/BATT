@@ -72,7 +72,9 @@ python Src/Plot/plot_sim_waveforms.py --csv Data/grid/nmc100ah_ecm_s02_t02_soc05
 6. \(C_1\)
 7. \(\tau_1 = R_1 C_1\)
 
-背景按 `rest` / `discharge` / `charge` 着色。细线是带噪声的测量列。
+背景按 `rest` / `discharge` / `charge` 着色。测量列用半透明实线。
+
+叠线不靠颜色硬分：真值实线、安时虚线、EKF 点划；测量实线（淡）、开环虚线、先验点划。约定在 `_common.OVERLAY`。
 
 CSV 须带表头；文件头 `#` 注释会被跳过，与 `nmc100ah_ecm_gen.py` 的输出格式一致。
 

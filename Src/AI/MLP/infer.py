@@ -18,8 +18,11 @@ import torch
 
 MLP_DIR = Path(__file__).resolve().parent
 AI_DIR = MLP_DIR.parent
+PLOT_DIR = MLP_DIR.parent.parent / "Plot"
 if str(AI_DIR) not in sys.path:
     sys.path.insert(0, str(AI_DIR))
+if str(PLOT_DIR) not in sys.path:
+    sys.path.insert(0, str(PLOT_DIR))
 
 from MLP.ckpt import format_epoch_list, resolve_ckpt_path
 from MLP.config import REPO_ROOT, TrainConfig
@@ -95,32 +98,31 @@ def write_infer_csv(path: Path, data: dict[str, np.ndarray]) -> None:
 def maybe_plot(data: dict[str, np.ndarray], fig_path: Path) -> None:
     import matplotlib.pyplot as plt
 
-    plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "DejaVu Sans"]
-    plt.rcParams["axes.unicode_minus"] = False
+    from _common import apply_style, plot_overlay, save_figure
+
+    apply_style()
     t = data["time_s"]
     fig, axes = plt.subplots(4, 1, sharex=True, figsize=(11, 8), constrained_layout=True)
     fig.suptitle("MLP-ECM 推理")
-    axes[0].plot(t, data["u_t_meas_v"], color="#e08a7a", lw=0.7, label="测量")
-    axes[0].plot(t, data["u_t_hat_v"], color="#9c2a2a", lw=1.1, label="MLP-ECM")
+    plot_overlay(axes[0], t, data["u_t_meas_v"], "meas", color="#e57373", label="测量")
+    plot_overlay(axes[0], t, data["u_t_hat_v"], "ol", color="#b71c1c", label="MLP-ECM")
     axes[0].set_ylabel("电压 / V")
     axes[0].legend(loc="upper right")
-    axes[1].plot(t, data["r0_ohm"] * 1e3, color="#90caf9", lw=0.8, label="教师 $R_0$")
-    axes[1].plot(t, data["r0_hat_ohm"] * 1e3, color="#1565c0", lw=1.1, label="估计 $R_0$")
-    axes[1].plot(t, data["r1_ohm"] * 1e3, color="#ffcc80", lw=0.8, label="教师 $R_1$")
-    axes[1].plot(t, data["r1_hat_ohm"] * 1e3, color="#ef6c00", lw=1.1, label="估计 $R_1$")
+    plot_overlay(axes[1], t, data["r0_ohm"] * 1e3, "truth", color="#90caf9", label="教师 $R_0$")
+    plot_overlay(axes[1], t, data["r0_hat_ohm"] * 1e3, "est", color="#0d47a1", label="估计 $R_0$")
+    plot_overlay(axes[1], t, data["r1_ohm"] * 1e3, "ol", color="#ffcc80", label="教师 $R_1$")
+    plot_overlay(axes[1], t, data["r1_hat_ohm"] * 1e3, "pri", color="#e65100", label="估计 $R_1$")
     axes[1].set_ylabel("电阻 / mΩ")
     axes[1].legend(loc="upper right", ncol=2)
-    axes[2].plot(t, data["c1_f"] * 1e-3, color="#80cbc4", lw=0.8, label="教师 $C_1$")
-    axes[2].plot(t, data["c1_hat_f"] * 1e-3, color="#00838f", lw=1.1, label="估计 $C_1$")
+    plot_overlay(axes[2], t, data["c1_f"] * 1e-3, "truth", color="#80cbc4", label="教师 $C_1$")
+    plot_overlay(axes[2], t, data["c1_hat_f"] * 1e-3, "est", color="#00695c", label="估计 $C_1$")
     axes[2].set_ylabel("$C_1$ / kF")
     axes[2].legend(loc="upper right")
     err_mV = (data["u_t_hat_v"] - data["u_t_meas_v"]) * 1e3
-    axes[3].plot(t, err_mV, color="#4e342e", lw=0.8)
+    plot_overlay(axes[3], t, err_mV, "ol", color="#4e342e", label=None)
     axes[3].set_ylabel("电压误差 / mV")
     axes[3].set_xlabel("时间 / s")
-    fig_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(fig_path, dpi=140, bbox_inches="tight")
-    plt.close(fig)
+    save_figure(fig, fig_path, show=False)
 
 
 def main() -> None:

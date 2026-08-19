@@ -46,6 +46,7 @@ FILE_NAME = "nmc100ah_ecm_s{i:02d}_t{j:02d}_soc{soc_pct:03.0f}_T{t_c:+03.0f}.csv
 
 import argparse
 import csv
+import json
 import sys
 from pathlib import Path
 
@@ -55,7 +56,7 @@ SIM_DIR = Path(__file__).resolve().parent
 if str(SIM_DIR) not in sys.path:
     sys.path.insert(0, str(SIM_DIR))
 
-from nmc100ah_ecm import NMC100AhECM, ScaledNMC100AhECM  # noqa: E402
+from nmc100ah_ecm import make_ecm  # noqa: E402
 from nmc100ah_ecm_gen import (  # noqa: E402
     DT_S,
     ENABLE_CUTOFF,
@@ -113,6 +114,12 @@ def run_grid(
     r1_scale: float = 1.0,
     c1_scale: float = 1.0,
     sequence: list[dict] | None = None,
+    soh: float = 1.0,
+    soh_a0: float = 1.0,
+    soh_a1: float = 1.5,
+    soh_ac: float = -0.3,
+    soh_capacity: float = 1.0,
+    rc2: bool = False,
 ) -> list[dict]:
     seq = SEQUENCE if sequence is None else sequence
     soc_axis, t_axis = build_grid(n_soc, n_temp)
@@ -128,10 +135,18 @@ def run_grid(
 
     if dry_run:
         model = None
-    elif r0_scale == 1.0 and r1_scale == 1.0 and c1_scale == 1.0:
-        model = NMC100AhECM()
     else:
-        model = ScaledNMC100AhECM(r0_scale=r0_scale, r1_scale=r1_scale, c1_scale=c1_scale)
+        model = make_ecm(
+            r0_scale=r0_scale,
+            r1_scale=r1_scale,
+            c1_scale=c1_scale,
+            soh=soh,
+            soh_a0=soh_a0,
+            soh_a1=soh_a1,
+            soh_ac=soh_ac,
+            soh_capacity=soh_capacity,
+            rc2=rc2,
+        )
     rows: list[dict] = []
 
     print(f"网格 {n_soc}×{n_temp} = {n_soc * n_temp} 份")
@@ -139,6 +154,10 @@ def run_grid(
     print("T   : " + ", ".join(f"{t:+.1f} °C" for t in t_axis))
     if r0_scale != 1.0 or r1_scale != 1.0 or c1_scale != 1.0:
         print(f"电阻缩放  R0×{r0_scale:g}  R1×{r1_scale:g}  C1×{c1_scale:g}")
+    if abs(soh - 1.0) > 1e-12 or abs(soh_capacity - 1.0) > 1e-12:
+        print(f"SOH  q={soh:g}  q_Q={soh_capacity:g}  a0={soh_a0:g} a1={soh_a1:g} aC={soh_ac:g}")
+    if rc2:
+        print("2RC  叠加慢支路（CSV 多 r2/c2/up2；BMS 不读）")
     if dry_run:
         print("dry-run，不写文件")
 
@@ -181,6 +200,7 @@ def run_grid(
                 noise_seed=seed,
                 noise_std=NOISE_STD,
                 enable_cutoff=ENABLE_CUTOFF,
+                rc2=rc2,
             )
             csv_path = write_csv(
                 out_dir / fname,
@@ -201,6 +221,10 @@ def run_grid(
                     f"# r0_scale={r0_scale}",
                     f"# r1_scale={r1_scale}",
                     f"# c1_scale={c1_scale}",
+                    "# schema_version=1.1.0",
+                    f"# soh={soh}",
+                    f"# soh_capacity={soh_capacity}",
+                    f"# rc2={int(rc2)}",
                 ],
             )
             rec.update(
@@ -223,6 +247,24 @@ def run_grid(
     if not dry_run:
         _write_index(out_dir / "index.csv", rows)
         print(f"索引  {out_dir / 'index.csv'}")
+        meta = {
+            "schema_version": "1.1.0",
+            "soh": soh,
+            "soh_capacity": soh_capacity,
+            "a_r0": soh_a0,
+            "a_r1": soh_a1,
+            "a_c1": soh_ac,
+            "rc2": rc2,
+            "r0_scale": r0_scale,
+            "r1_scale": r1_scale,
+            "c1_scale": c1_scale,
+            "ocv_aging": False,
+        }
+        if hasattr(model, "meta"):
+            meta.update(model.meta())
+        (out_dir / "ecm_meta.json").write_text(
+            json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
     return rows
 
 
@@ -260,6 +302,12 @@ def main() -> None:
     parser.add_argument("--r0-scale", type=float, default=1.0, help="整张 R0 乘子（假老化 / 换对象）")
     parser.add_argument("--r1-scale", type=float, default=1.0, help="整张 R1 乘子")
     parser.add_argument("--c1-scale", type=float, default=1.0, help="整张 C1 乘子")
+    parser.add_argument("--soh", type=float, default=1.0, help="电阻/电容寿命因子 q，1=BOL")
+    parser.add_argument("--soh-a0", type=float, default=1.0, help="R0 的 a0，q=0.9 且 a0=1 → ×1.10")
+    parser.add_argument("--soh-a1", type=float, default=1.5, help="R1 的 a1，略大于 a0")
+    parser.add_argument("--soh-ac", type=float, default=-0.3, help="C1 的 aC，应 <0")
+    parser.add_argument("--soh-capacity", type=float, default=1.0, help="容量因子 q_Q，第一次不要和 q 叠")
+    parser.add_argument("--rc2", action="store_true", help="叠加慢支路，BMS 仍 1RC")
     args = parser.parse_args()
 
     run_grid(
@@ -272,6 +320,12 @@ def main() -> None:
         r0_scale=args.r0_scale,
         r1_scale=args.r1_scale,
         c1_scale=args.c1_scale,
+        soh=args.soh,
+        soh_a0=args.soh_a0,
+        soh_a1=args.soh_a1,
+        soh_ac=args.soh_ac,
+        soh_capacity=args.soh_capacity,
+        rc2=args.rc2,
     )
 
 

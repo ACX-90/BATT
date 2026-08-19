@@ -18,6 +18,33 @@ if str(SIM_DIR) not in sys.path:
     sys.path.insert(0, str(SIM_DIR))
 
 
+# 叠线时靠线型分，不要只靠颜色。先画参考，估计画在上面。
+# 真值/安时/EKF：实线、虚线、点划。测量/开环/先验：细实线、虚线、点划。
+OVERLAY = {
+    "truth": {"ls": "-", "lw": 2.05, "alpha": 0.72, "zorder": 2},
+    "ah": {"ls": "--", "lw": 1.55, "alpha": 0.95, "zorder": 3},
+    "ekf": {"ls": "-.", "lw": 1.65, "alpha": 1.0, "zorder": 4},
+    "meas": {"ls": "-", "lw": 1.05, "alpha": 0.50, "zorder": 2},
+    "ol": {"ls": "--", "lw": 1.60, "alpha": 0.95, "zorder": 3},
+    "pri": {"ls": "-.", "lw": 1.65, "alpha": 1.0, "zorder": 4},
+    "post": {"ls": ":", "lw": 1.75, "alpha": 1.0, "zorder": 5},
+    "est": {"ls": "--", "lw": 1.55, "alpha": 1.0, "zorder": 4},
+}
+
+
+def overlay_kw(kind: str, *, color: str, label: str | None = None, **extra) -> dict:
+    if kind not in OVERLAY:
+        raise KeyError(f"未知叠线种类 {kind}，可选 {tuple(OVERLAY)}")
+    kw = {**OVERLAY[kind], "color": color, **extra}
+    if label is not None:
+        kw["label"] = label
+    return kw
+
+
+def plot_overlay(ax, x, y, kind: str, *, color: str, label: str | None = None, **extra):
+    return ax.plot(x, y, **overlay_kw(kind, color=color, label=label, **extra))
+
+
 def apply_style() -> None:
     import matplotlib.pyplot as plt
 
@@ -32,6 +59,7 @@ def apply_style() -> None:
             "axes.titlesize": 11,
             "axes.labelsize": 10,
             "legend.fontsize": 8,
+            "lines.solid_capstyle": "round",
         }
     )
 

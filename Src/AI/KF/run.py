@@ -77,7 +77,7 @@ def write_log_csv(path: Path, data: dict[str, np.ndarray]) -> None:
 def plot_filter(data: dict[str, np.ndarray], fig_path: Path, *, title: str, stats: dict[str, float], show: bool) -> Path:
     from matplotlib import pyplot as plt
 
-    from _common import apply_style, save_figure
+    from _common import apply_style, plot_overlay, save_figure
 
     apply_style()
     t = data["time_s"]
@@ -86,9 +86,9 @@ def plot_filter(data: dict[str, np.ndarray], fig_path: Path, *, title: str, stat
 
     ax = axes[0]
     if "soc_true" in data:
-        ax.plot(t, data["soc_true"], color="#9e9e9e", lw=0.9, label="真值")
-    ax.plot(t, data["soc_ah"], color="#90caf9", lw=1.0, label="安时")
-    ax.plot(t, data["soc_post"], color="#1565c0", lw=1.2, label="EKF $s^+$")
+        plot_overlay(ax, t, data["soc_true"], "truth", color="#616161", label="真值")
+    plot_overlay(ax, t, data["soc_ah"], "ah", color="#64b5f6", label="安时")
+    plot_overlay(ax, t, data["soc_post"], "ekf", color="#0d47a1", label="EKF $s^+$")
     ax.set_ylabel("SOC")
     ax.legend(loc="upper right", ncol=3)
     if "s_post_rmse" in stats:
@@ -101,9 +101,9 @@ def plot_filter(data: dict[str, np.ndarray], fig_path: Path, *, title: str, stat
         )
 
     ax = axes[1]
-    ax.plot(t, data["u_t_meas_v"], color="#e08a7a", lw=0.7, alpha=0.85, label="测量")
-    ax.plot(t, data["u_t_ol"], color="#6d4c41", lw=1.0, label="开环 ECM")
-    ax.plot(t, data["u_t_pri_v"], color="#9c2a2a", lw=1.05, label="先验 $\\hat U_t^-$")
+    plot_overlay(ax, t, data["u_t_meas_v"], "meas", color="#e57373", label="测量")
+    plot_overlay(ax, t, data["u_t_ol"], "ol", color="#5d4037", label="开环 ECM")
+    plot_overlay(ax, t, data["u_t_pri_v"], "pri", color="#b71c1c", label="先验 $\\hat U_t^-$")
     ax.set_ylabel("电压 / V")
     ax.legend(loc="upper right", ncol=3)
     ax.set_title(
@@ -114,22 +114,22 @@ def plot_filter(data: dict[str, np.ndarray], fig_path: Path, *, title: str, stat
     )
 
     ax = axes[2]
-    ax.axhline(0.0, color="#9e9e9e", lw=0.8)
-    ax.plot(t, data["e_ol"] * 1e3, color="#6d4c41", lw=0.8, label="$e^{ol}$")
-    ax.plot(t, data["e_pri"] * 1e3, color="#9c2a2a", lw=0.8, label="$e^{pri}$")
-    ax.plot(t, data["e_post"] * 1e3, color="#00838f", lw=0.8, alpha=0.85, label="$e^{post}$")
+    ax.axhline(0.0, color="#9e9e9e", lw=0.8, zorder=1)
+    plot_overlay(ax, t, data["e_ol"] * 1e3, "ol", color="#5d4037", label="$e^{ol}$")
+    plot_overlay(ax, t, data["e_pri"] * 1e3, "pri", color="#b71c1c", label="$e^{pri}$")
+    plot_overlay(ax, t, data["e_post"] * 1e3, "post", color="#00695c", label="$e^{post}$")
     ax.set_ylabel("电压误差 / mV")
     ax.legend(loc="upper right", ncol=3)
 
     ax = axes[3]
-    ax.plot(t, data["r0_ohm"] * 1e3, color="#1565c0", lw=1.05, label="$R_0$")
-    ax.plot(t, data["r1_ohm"] * 1e3, color="#ef6c00", lw=1.05, label="$R_1$")
+    plot_overlay(ax, t, data["r0_ohm"] * 1e3, "truth", color="#1565c0", label="$R_0$")
+    plot_overlay(ax, t, data["r1_ohm"] * 1e3, "ol", color="#ef6c00", label="$R_1$")
     ax.set_ylabel("电阻 / mΩ")
     ax.legend(loc="upper right", ncol=2)
 
     ax = axes[4]
-    ax.plot(t, data["nis"], color="#4527a0", lw=0.85)
-    ax.axhline(1.0, color="#9e9e9e", lw=0.8)
+    ax.axhline(1.0, color="#9e9e9e", ls="--", lw=0.9, zorder=1)
+    plot_overlay(ax, t, data["nis"], "truth", color="#4527a0", label="NIS")
     ax.set_ylabel("NIS")
     ax.set_xlabel("时间 / s")
     ax.set_title(f"NIS 中位 {stats['nis_median']:.2f}  均值 {stats['nis_mean']:.2f}", loc="left", fontsize=9)

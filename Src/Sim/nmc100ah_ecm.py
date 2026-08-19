@@ -401,4 +401,154 @@ class ScaledNMC100AhECM:
         return r0 * self.r0_scale, r1 * self.r1_scale, c1 * self.c1_scale
 
 
-__all__ = ["NMC100AhECM", "ECMResult", "ScaledNMC100AhECM"]
+# 叠加 2RC：Doc/01-b §11。R2 跟 R1 形状，参考点 0.28 mΩ、τ2=90 s。
+R1_REF_OHM = 6.5e-4
+R2_REF_OHM = 2.8e-4
+R2_OVER_R1 = R2_REF_OHM / R1_REF_OHM
+TAU2_S = 90.0
+SOH_A0 = 1.0
+SOH_A1 = 1.5
+SOH_AC = -0.3
+
+
+class _CellCapacityView:
+    def __init__(self, cell: object, q_capacity: float) -> None:
+        object.__setattr__(self, "_cell", cell)
+        object.__setattr__(self, "capacity_ah", float(cell.capacity_ah) * float(q_capacity))
+
+    def __getattr__(self, name: str):
+        return getattr(self._cell, name)
+
+
+class _ParamsCapacityView:
+    def __init__(self, params: object, q_capacity: float) -> None:
+        object.__setattr__(self, "_params", params)
+        object.__setattr__(self, "cell", _CellCapacityView(params.cell, q_capacity))
+
+    def __getattr__(self, name: str):
+        return getattr(self._params, name)
+
+
+class AgingNMC100AhECM:
+    """电阻 / 电容寿命因子，可选叠加 2RC。OCV 不动。q=1 且非 2RC 时不要用这个类。
+
+    R' = R_BOL * (1 + a (1-q))，C' = C_BOL * (1 + a_C (1-q))，a_C<0。
+    q_capacity 只改安时积分用的 Q，EKF 仍按 100 Ah 时才构成容量错配。
+    """
+
+    def __init__(
+        self,
+        inner: NMC100AhECM | ScaledNMC100AhECM | None = None,
+        *,
+        q: float = 1.0,
+        a0: float = SOH_A0,
+        a1: float = SOH_A1,
+        a_c: float = SOH_AC,
+        q_capacity: float = 1.0,
+        rc2: bool = False,
+        r2_over_r1: float = R2_OVER_R1,
+        tau2_s: float = TAU2_S,
+    ) -> None:
+        self.inner = inner if inner is not None else NMC100AhECM()
+        self.q = float(q)
+        self.a0 = float(a0)
+        self.a1 = float(a1)
+        self.a_c = float(a_c)
+        self.q_capacity = float(q_capacity)
+        self.rc2 = bool(rc2)
+        self.r2_over_r1 = float(r2_over_r1)
+        self.tau2_s = float(tau2_s)
+        if abs(self.q_capacity - 1.0) < 1e-12:
+            self.params = self.inner.params
+        else:
+            self.params = _ParamsCapacityView(self.inner.params, self.q_capacity)
+
+    def _factors(self) -> tuple[float, float, float]:
+        dq = 1.0 - self.q
+        f0 = 1.0 + self.a0 * dq
+        f1 = 1.0 + self.a1 * dq
+        fc = 1.0 + self.a_c * dq
+        if f0 <= 0 or f1 <= 0 or fc <= 0:
+            raise ValueError(f"寿命因子非正：q={self.q} a0={self.a0} a1={self.a1} a_c={self.a_c}")
+        return f0, f1, fc
+
+    def evaluate(self, *args, **kwargs):
+        r0, r1, c1 = self.inner.evaluate(*args, **kwargs)
+        f0, f1, fc = self._factors()
+        return r0 * f0, r1 * f1, c1 * fc
+
+    def rc2_from_r1(self, r1: float) -> tuple[float, float, float]:
+        r2 = self.r2_over_r1 * float(r1)
+        if r2 <= 1e-12:
+            raise RuntimeError("r2 非正")
+        c2 = self.tau2_s / r2
+        return r2, c2, self.tau2_s
+
+    def meta(self) -> dict:
+        f0, f1, fc = self._factors()
+        return {
+            "schema_version": "1.1.0",
+            "soh": self.q,
+            "soh_capacity": self.q_capacity,
+            "a_r0": self.a0,
+            "a_r1": self.a1,
+            "a_c1": self.a_c,
+            "r0_factor": f0,
+            "r1_factor": f1,
+            "c1_factor": fc,
+            "rc2": self.rc2,
+            "r2_over_r1": self.r2_over_r1,
+            "tau2_s": self.tau2_s,
+            "ocv_aging": False,
+        }
+
+
+def make_ecm(
+    *,
+    r0_scale: float = 1.0,
+    r1_scale: float = 1.0,
+    c1_scale: float = 1.0,
+    soh: float = 1.0,
+    soh_a0: float = SOH_A0,
+    soh_a1: float = SOH_A1,
+    soh_ac: float = SOH_AC,
+    soh_capacity: float = 1.0,
+    rc2: bool = False,
+    r2_over_r1: float = R2_OVER_R1,
+    tau2_s: float = TAU2_S,
+) -> NMC100AhECM | ScaledNMC100AhECM | AgingNMC100AhECM:
+    """组装仿真用电芯。默认仍是 BOL 1RC。"""
+    scaled = not (r0_scale == 1.0 and r1_scale == 1.0 and c1_scale == 1.0)
+    aging = abs(soh - 1.0) > 1e-12 or abs(soh_capacity - 1.0) > 1e-12 or rc2
+    inner: NMC100AhECM | ScaledNMC100AhECM
+    if scaled:
+        inner = ScaledNMC100AhECM(r0_scale=r0_scale, r1_scale=r1_scale, c1_scale=c1_scale)
+    else:
+        inner = NMC100AhECM()
+    if not aging:
+        return inner
+    return AgingNMC100AhECM(
+        inner,
+        q=soh,
+        a0=soh_a0,
+        a1=soh_a1,
+        a_c=soh_ac,
+        q_capacity=soh_capacity,
+        rc2=rc2,
+        r2_over_r1=r2_over_r1,
+        tau2_s=tau2_s,
+    )
+
+
+__all__ = [
+    "NMC100AhECM",
+    "ECMResult",
+    "ScaledNMC100AhECM",
+    "AgingNMC100AhECM",
+    "make_ecm",
+    "R2_OVER_R1",
+    "TAU2_S",
+    "SOH_A0",
+    "SOH_A1",
+    "SOH_AC",
+]
