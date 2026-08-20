@@ -1,15 +1,21 @@
 {
   "mode": "replay",
-  "source_ckpt": "C:\\Users\\26354\\Desktop\\workspace\\Battery\\BATT\\Data\\ai_mlp\\best.pt",
+  "source_ckpt": "C:\\Users\\pyx private\\Desktop\\BATT\\Data\\ai_mlp\\last.pt",
   "new_dir": "Data/ai_kf/logs",
   "replay_dir": "Data/grid",
+  "eval_old_dir": "Data/grid",
   "beta": 1.0,
+  "epochs": 10,
   "ref_before_mohm": [
-    0.7579074590466917,
-    0.6133010028861463
+    0.8024525595828891,
+    0.6517020519822836
   ],
   "ref_after_mohm": [
-    0.7678691763430834,
-    0.6257141940295696
-  ]
+    0.8006056887097657,
+    0.6731415051035583
+  ],
+  "new_rmse_before": 0.022099759429693222,
+  "old_rmse_before": 0.004093125364026771,
+  "new_rmse_after": 0.02028624713420868,
+  "old_rmse_after": 0.004469008480485242
 }

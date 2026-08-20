@@ -57,7 +57,7 @@ python Src/AI/KF/run.py --r0-scale 1.2
 |------|------|
 | `--soc-error` | 开机 SOC 偏差 |
 | `--current-bias` | 电流零偏 / A（放电为正），安时会漂，EKF 应用电压拉回来 |
-| `--capacity-scale` | 容量用错的倍数 |
+| `--capacity-scale` | 只改 EKF 安时分母，仿真 CSV 仍 100 Ah。短波 5% 几乎看不见；小时级才斜。见 `Doc/03-c` §5.3 |
 | `--r0-scale` | 故意放大 MLP 的 \(R_0\)，边沿 \(e^{ol}\) 应变大，SOC 不应被长期拉走 |
 | `--export` | 再写一份带 `soc_ah` / `e_ol` 的日志，给增量用 |
 | `--dr0` | 打开慢变 \(\delta R_0\)（默认关） |

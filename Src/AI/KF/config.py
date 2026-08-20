@@ -14,7 +14,7 @@ REPO_ROOT = KF_DIR.parent.parent.parent
 @dataclass
 class KfConfig:
     dt_s: float = 0.1
-    capacity_ah: float = 100.0
+    capacity_ah: float = 100.0  # 与仿真默认一致。容量错配走 run.py --capacity-scale，不要改这里
 
     # 过程噪声（每步方差）。s 略大才能靠电压纠安时漂。
     q_s: float = 1.0e-8

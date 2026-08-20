@@ -2,7 +2,7 @@
 
 > 对象：100 Ah NMC，BMS 侧锁死方案 B 一阶 Thevenin + EKF\((s,U_p)\) + 开环增量  
 > 对照：`Doc/01`–`04`、`Doc/A0`，数字 `Doc/04-a`，用法 `Doc/04-b`，仓库现状见 `README.md`  
-> 目的：把评估结论收成可执行分期。架构判断已经做完；第 0 期前半（A–F）已齐，主线转到「生成器比 BMS 更真 + 第 1 期滑窗」
+> 目的：把评估结论收成可执行分期。架构判断已经做完；第 0 期 A–H 已齐，主线转到第 1 期滑窗 / 残差头。英飞凌 demo 300 s 报 1% SOC 不够当过关，小时级与 \(\hat Q\neq Q\) 就是补这扇窗
 
 默认电路仍是一阶 Thevenin，放电电流为正，\(\Delta t=0.1\,\mathrm{s}\)。BMS 默认方案 B：MLP 只出 \(R_0,R_1\)，\(C_1\equiv C_1^\star\)。
 
@@ -215,8 +215,9 @@ C = C^{\mathrm{BOL}}\cdot\bigl(1+a_C(1-q)\bigr),\ a_C<0
 | `Doc/03-b` | 不换骨干；滑窗是协议 |
 | `Doc/03-c` | 开环损失、门控 |
 | `Doc/03-d` | 残差头、10 mV 规则 |
-| `Doc/04-a` | 第 0 期前半对照数字 |
+| `Doc/04-a` | 第 0 期 A–H 对照数字 |
 | `Doc/04-b` | 增量应用手册 |
+| `Doc/04-c` | 第 0 期结题汇报（可分享） |
 | `Doc/A0-a` | 包级、TC4D7 |
 | `Doc/A0-b` | ST / NXP AI MCU 与 TC4D7 对照 |
 | `Src/AI/KF/increment.py` | Replay / 缩放 / 微调 |

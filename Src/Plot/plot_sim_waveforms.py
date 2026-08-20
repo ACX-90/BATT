@@ -71,10 +71,10 @@ def plot_waveforms(data: dict[str, np.ndarray], *, show: bool = False) -> Path:
     axes[4].set_ylabel("电阻 / mΩ")
     axes[4].legend(loc="upper right", ncol=3)
 
-    axes[5].plot(t, data["c1_f"] * 1e-3, color="#00838f", lw=1.1)
+    plot_overlay(axes[5], t, data["c1_f"] * 1e-3, "truth", color="#00838f")
     axes[5].set_ylabel("$C_1$ / kF")
 
-    axes[6].plot(t, data["tau1_s"], color="#4e342e", lw=1.1)
+    plot_overlay(axes[6], t, data["tau1_s"], "truth", color="#4e342e")
     axes[6].set_ylabel("$\\tau_1$ / s")
     axes[6].set_xlabel("时间 / s")
 

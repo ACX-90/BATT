@@ -167,7 +167,7 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Script/gen_grid.bat`](Script/gen_grid.bat) | SOC×温度网格 10×10，写出 `Data/grid/`（先清旧 CSV） | `python .\Src\Sim\nmc100ah_ecm_gen_grid.py --n-soc 10 --n-temp 10` |
 | [`Script/train_100.bat`](Script/train_100.bat) | 方案 B，从头训 100 个电压 epoch | `python Src/AI/MLP/train.py --scheme B --epochs 100` |
 | [`Script/train_1000_resume.bat`](Script/train_1000_resume.bat) | 方案 B，从最新权重再训 1000 轮 | `python Src/AI/MLP/train.py --scheme B --epochs 1000 --resume` |
-| [`Script/test.bat`](Script/test.bat) | 最新权重 + `Data/nmc100ah_ecm_sim.csv`，弹窗出对照图 | `python Src/AI/MLP/test.py --show` |
+| [`Script/test_mlp.bat`](Script/test_mlp.bat) | 最新权重 + `Data/nmc100ah_ecm_sim.csv`，弹窗出对照图 | `python Src/AI/MLP/test.py --show` |
 | [`Script/kf_run.bat`](Script/kf_run.bat) | EKF 闭环：SOC 初偏 + 电流零偏 | `python Src/AI/KF/run.py --soc-error 0.05 --current-bias 5 --show` |
 | [`Script/kf_increment.bat`](Script/kf_increment.bat) | 开环电压 Replay 增量 | `python Src/AI/KF/increment.py --mode replay ...` |
 | [`Script/kf_compare.bat`](Script/kf_compare.bat) | 电阻 ×1.15 四档对照 | `python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15` |
@@ -207,9 +207,10 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Doc/03-a-MLP-ECM增量学习方案与问题.md`](Doc/03-a-MLP-ECM增量学习方案与问题.md) | `--resume` 不是增量；回放 / 缩放 / 扩维及本仓库的坑 |
 | [`Doc/03-b-非MLP结构GRU-LSTM评估.md`](Doc/03-b-非MLP结构GRU-LSTM评估.md) | 循环核不宜换点式头；滑窗多拍残差是训练协议 |
 | [`Doc/03-c-卡尔曼SOC与MLP-ECM融合增量学习.md`](Doc/03-c-卡尔曼SOC与MLP-ECM融合增量学习.md) | EKF 估 SOC；MLP / ECM / KF 分工；用开环电压误差增量 |
-| [`Doc/03-d-英飞凌残差头增量学习方案评估.md`](Doc/03-d-英飞凌残差头增量学习方案评估.md) | 3×8×2 残差头；每芯 18 个数；10 mV / 0.1 s 反传 |
-| [`Doc/04-a-合成增量对照实验.md`](Doc/04-a-合成增量对照实验.md) | 第 0 期前半 A–F 对照数字（涨阻 / 填洞 / 同分布 / 测量列 / δR0 / 小时负例） |
+| [`Doc/03-d-英飞凌残差头增量学习方案评估.md`](Doc/03-d-英飞凌残差头增量学习方案评估.md) | 3×8×2 残差头；10 mV / 0.1 s；300 s 报 1% SOC 不够当过关 |
+| [`Doc/04-a-合成增量对照实验.md`](Doc/04-a-合成增量对照实验.md) | 第 0 期 A–H 对照数字（涨阻 / 填洞 / 同分布 / 测量列 / δR0 / 小时负例 / q=0.90 / 2RC） |
 | [`Doc/04-b-增量学习应用手册.md`](Doc/04-b-增量学习应用手册.md) | 增量怎么用：按任务选档、门控、验收、现场流程 |
+| [`Doc/04-c-第0期实验汇报.md`](Doc/04-c-第0期实验汇报.md) | 第 0 期结题汇报（可分享）：完成度、八组读法、带走的规则 |
 | [`Doc/A0-a-TC4D7-PPU与800V系统融合评估.md`](Doc/A0-a-TC4D7-PPU与800V系统融合评估.md) | TC4D7+PPU、800 V 包上按 demo 评估，再谈优化 |
 | [`Doc/A0-b-ST与NXP的AI-MCU对照.md`](Doc/A0-b-ST与NXP的AI-MCU对照.md) | ST P3E / NXP S32K37·K5 与英飞凌 TC4D7 对照 |
 

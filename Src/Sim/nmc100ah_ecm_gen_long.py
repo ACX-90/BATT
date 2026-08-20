@@ -30,6 +30,20 @@ SEQ_CHG_PARK = [
     {"mode": "rest", "duration_s": 7200.0},
 ]
 
+SEQ_CHG_DIS_LOOP = [ {"mode": "rest", "duration_s": 30.0}, ] + \
+[
+    {"mode": "charge", "duration_s": 300, "c_rate": 1.0},
+    {"mode": "rest", "duration_s": 200},
+] * 10 + \
+[
+    {"mode": "rest", "duration_s": 1000.0},
+] + \
+[
+    {"mode": "discharge", "duration_s": 300, "c_rate": 1.0},
+    {"mode": "rest", "duration_s": 200},
+] * 10
+SEQ_CHG_DIS_LOOP = SEQ_CHG_DIS_LOOP * 3
+
 CASES = {
     "cc_rest": {
         "out": "Data/long/cc_rest.csv",
@@ -45,6 +59,13 @@ CASES = {
         "seed": 20260832,
         "tag": "F-chg_park",
     },
+    "loop": {
+        "out": "Data/long/loop.csv",
+        "sequence": SEQ_CHG_DIS_LOOP,
+        "soc0": 0.10,
+        "seed": 20260833,
+        "tag": "F-loop",
+    }
 }
 
 
