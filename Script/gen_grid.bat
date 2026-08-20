@@ -22,6 +22,11 @@
 ::   --out-dir PATH    output dir  -- default Data/grid
 ::   --seed N          base noise seed; each case offsets by i*100+j
 ::   --no-noise        disable meas noise
+::   --noise-voltage V voltage meas std / V   (task D: 0.007)
+::   --noise-current A current meas std / A   (task D: 0.1)
+::   --noise-temp C    temperature meas std / C (task D: 0.5)
+::   --noise-soc X     SOC meas std, 1 = 100 pp (task D: 0.005)
+::                     raise noise to a NEW directory; do not rewrite Data/grid
 ::   --dry-run         print grid only; no delete, no sim
 ::
 :: scan range: Src/Sim/nmc100ah_ecm_gen_grid.py header

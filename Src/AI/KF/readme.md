@@ -84,14 +84,15 @@ python Src/AI/KF/increment.py --eval-only --new-dir Data/grid --new-glob *T+50.c
 | `finetune` | 只扫新数据，旧温区容易忘 |
 | `retrain` | 旧+新合集，从旧权重接着训（冻 scaler）。对照上界，不是增量 |
 
-电阻整张 ×1.15 冒充老化，一次跑四档（外加冻结基线）：
+电阻整张 ×1.15 冒充老化，一次跑四档（外加冻结基线）。任务 A 挂 100 轮真值列舰队：
 
 ```powershell
-python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15 --epochs 10
+python Src/AI/MLP/train.py --scheme B --epochs 100 --data-dir Data/grid --out-dir Data/ai_mlp_100 --fresh
+python Src/AI/KF/compare.py --mlp-dir Data/ai_mlp_100 --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_kf/compare --epochs 10 --replay-n 50
 python Src/AI/KF/compare.py --smoke
 ```
 
-`--make-new` 把缩放网格写到 `--new-dir`（默认 `Data/soh_k115/`），**不碰** `Data/grid/`。结果在 `Data/ai_kf/compare/compare.md`。读数见 [`Doc/04-a`](../../Doc/04-a-合成增量对照实验.md)，用法见 [`Doc/04-b`](../../Doc/04-b-增量学习应用手册.md)。整体涨阻时 `scale` 不该明显输给 `retrain`；`finetune` 旧集变差是预期失败对照。
+网格已在时不要 `--make-new`（会清掉 `Data/soh_k115/`）。结果在 `Data/ai_kf/compare/compare.md`。读数见 [`Doc/04-a`](../../Doc/04-a-合成增量对照实验.md)，用法见 [`Doc/04-b`](../../Doc/04-b-增量学习应用手册.md)。整体涨阻时 `scale` 不该明显输给 `retrain`；`finetune` 旧集变差是预期失败对照。底板按 100 轮约 7.8 mV 算。
 
 填洞（任务 B，挖掉 −10 °C）走 `hole.py`，不要对全网格舰队做增量：
 
@@ -103,14 +104,16 @@ python Src/AI/KF/hole.py --compare-only
 
 写出 `Data/grid_wo_tm10/`、`Data/grid_tm10/`、`Data/ai_mlp_hole/`、`Data/ai_kf/compare_hole/`。`--task hole` 只改 `compare.md` 的验收口径。读数见 [`Doc/04-a`](../../Doc/04-a-合成增量对照实验.md) §7.1：Replay / 重训为正途，缩放 \(k\) 会拆开。
 
-测量列舰队（任务 D）不要改 `config.py` 默认值：
+测量列舰队（任务 D）不要改 `config.py` 默认值，也不要改 `Data/grid/`。抬噪声写到新目录，100 轮即可（无噪声 100 轮底板约 7 mV，不必追 500+ 的 4 mV）：
 
 ```powershell
-python Src/AI/MLP/train.py --scheme B --epochs 100 --out-dir Data/ai_mlp_meas --use-meas-inputs
-python Src/AI/KF/compare.py --task meas --mlp-dir Data/ai_mlp_meas --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_kf/compare_meas
+python Src/Sim/nmc100ah_ecm_gen_grid.py --n-soc 10 --n-temp 10 --out-dir Data/grid_noisy --noise-voltage 0.007 --noise-current 0.1 --noise-temp 0.5 --noise-soc 0.005
+python Src/Sim/nmc100ah_ecm_gen_grid.py --n-soc 5 --n-temp 5 --out-dir Data/soh_k115_noisy --r0-scale 1.15 --r1-scale 1.15 --noise-voltage 0.007 --noise-current 0.1 --noise-temp 0.5 --noise-soc 0.005
+python Src/AI/MLP/train.py --scheme B --epochs 100 --data-dir Data/grid_noisy --out-dir Data/ai_mlp_meas --use-meas-inputs --fresh
+python Src/AI/KF/compare.py --task meas --mlp-dir Data/ai_mlp_meas --new-dir Data/soh_k115_noisy --old-dir Data/grid_noisy --out-dir Data/ai_kf/compare_meas --epochs 10 --replay-n 50
 ```
 
-读数见 `Doc/04-a` §7.3：底板大约 +3 mV，×1.15 仍走缩放。
+读数见 `Doc/04-a` §7.3：底板相对无噪声 100 轮约 7 mV 来算，×1.15 仍走缩放。
 
 \(\delta R_0\)（任务 E）同一条 BOL 波，只把 MLP 的 \(R_0\) ×1.2：
 

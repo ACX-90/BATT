@@ -109,6 +109,7 @@ def run_grid(
     output_dir: str | Path = OUTPUT_DIR,
     noise_enable: bool = NOISE_ENABLE,
     noise_seed: int = NOISE_SEED,
+    noise_std: dict[str, float] | None = None,
     dry_run: bool = False,
     r0_scale: float = 1.0,
     r1_scale: float = 1.0,
@@ -122,6 +123,7 @@ def run_grid(
     rc2: bool = False,
 ) -> list[dict]:
     seq = SEQUENCE if sequence is None else sequence
+    std = dict(NOISE_STD if noise_std is None else noise_std)
     soc_axis, t_axis = build_grid(n_soc, n_temp)
     n_soc, n_temp = int(soc_axis.size), int(t_axis.size)
     out_dir = Path(output_dir)
@@ -152,6 +154,16 @@ def run_grid(
     print(f"网格 {n_soc}×{n_temp} = {n_soc * n_temp} 份")
     print("SOC : " + ", ".join(f"{s:.3f}" for s in soc_axis))
     print("T   : " + ", ".join(f"{t:+.1f} °C" for t in t_axis))
+    if noise_enable:
+        print(
+            "噪声  "
+            f"U={std.get('voltage_v', 0.0)*1e3:.2f} mV  "
+            f"I={std.get('current_a', 0.0)*1e3:.1f} mA  "
+            f"T={std.get('temp_c', 0.0):.3f} °C  "
+            f"SOC={std.get('soc', 0.0)*1e2:.3f} pp"
+        )
+    else:
+        print("噪声  关闭")
     if r0_scale != 1.0 or r1_scale != 1.0 or c1_scale != 1.0:
         print(f"电阻缩放  R0×{r0_scale:g}  R1×{r1_scale:g}  C1×{c1_scale:g}")
     if abs(soh - 1.0) > 1e-12 or abs(soh_capacity - 1.0) > 1e-12:
@@ -198,7 +210,7 @@ def run_grid(
                 u_p0=U_P0,
                 noise_enable=noise_enable,
                 noise_seed=seed,
-                noise_std=NOISE_STD,
+                noise_std=std,
                 enable_cutoff=ENABLE_CUTOFF,
                 rc2=rc2,
             )
@@ -209,7 +221,7 @@ def run_grid(
                 soc0=float(soc0),
                 noise_enable=noise_enable,
                 noise_seed=seed,
-                noise_std=NOISE_STD,
+                noise_std=std,
                 sequence=seq,
                 extra_meta=[
                     "# source=nmc100ah_ecm_gen_grid",
@@ -259,6 +271,8 @@ def run_grid(
             "r1_scale": r1_scale,
             "c1_scale": c1_scale,
             "ocv_aging": False,
+            "noise_enable": bool(noise_enable),
+            "noise_std": std,
         }
         if hasattr(model, "meta"):
             meta.update(model.meta())
@@ -298,6 +312,10 @@ def main() -> None:
     parser.add_argument("--out-dir", default=OUTPUT_DIR, help="输出目录")
     parser.add_argument("--seed", type=int, default=None, help="覆盖噪声种子")
     parser.add_argument("--no-noise", action="store_true", help="关闭噪声")
+    parser.add_argument("--noise-voltage", type=float, default=None, help="端电压测量噪声标准差 / V")
+    parser.add_argument("--noise-current", type=float, default=None, help="电流测量噪声标准差 / A")
+    parser.add_argument("--noise-temp", type=float, default=None, help="温度测量噪声标准差 / °C")
+    parser.add_argument("--noise-soc", type=float, default=None, help="SOC 测量噪声标准差，1 表示 100 个百分点")
     parser.add_argument("--dry-run", action="store_true", help="只打印网格，不仿真")
     parser.add_argument("--r0-scale", type=float, default=1.0, help="整张 R0 乘子（假老化 / 换对象）")
     parser.add_argument("--r1-scale", type=float, default=1.0, help="整张 R1 乘子")
@@ -310,12 +328,23 @@ def main() -> None:
     parser.add_argument("--rc2", action="store_true", help="叠加慢支路，BMS 仍 1RC")
     args = parser.parse_args()
 
+    std = dict(NOISE_STD)
+    if args.noise_voltage is not None:
+        std["voltage_v"] = args.noise_voltage
+    if args.noise_current is not None:
+        std["current_a"] = args.noise_current
+    if args.noise_temp is not None:
+        std["temp_c"] = args.noise_temp
+    if args.noise_soc is not None:
+        std["soc"] = args.noise_soc
+
     run_grid(
         n_soc=args.n_soc,
         n_temp=args.n_temp,
         output_dir=args.out_dir,
         noise_enable=NOISE_ENABLE and not args.no_noise,
         noise_seed=NOISE_SEED if args.seed is None else args.seed,
+        noise_std=std,
         dry_run=args.dry_run,
         r0_scale=args.r0_scale,
         r1_scale=args.r1_scale,

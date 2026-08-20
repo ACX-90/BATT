@@ -170,9 +170,9 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Script/test_mlp.bat`](Script/test_mlp.bat) | 最新权重 + `Data/nmc100ah_ecm_sim.csv`，弹窗出对照图 | `python Src/AI/MLP/test.py --show` |
 | [`Script/kf_run.bat`](Script/kf_run.bat) | EKF 闭环：SOC 初偏 + 电流零偏 | `python Src/AI/KF/run.py --soc-error 0.05 --current-bias 5 --show` |
 | [`Script/kf_increment.bat`](Script/kf_increment.bat) | 开环电压 Replay 增量 | `python Src/AI/KF/increment.py --mode replay ...` |
-| [`Script/kf_compare.bat`](Script/kf_compare.bat) | 电阻 ×1.15 四档对照 | `python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15` |
+| [`Script/kf_compare.bat`](Script/kf_compare.bat) | 电阻 ×1.15 四档对照（100 轮真值列） | `compare.py --mlp-dir Data/ai_mlp_100 ...` |
 | [`Script/kf_hole.bat`](Script/kf_hole.bat) | 填洞：挖掉 −10 °C，另训舰队再四档对照 | `python Src/AI/KF/hole.py` |
-| [`Script/kf_meas.bat`](Script/kf_meas.bat) | 测量列舰队 + ×1.15 四档 | `train.py --use-meas-inputs` 再 `compare.py --task meas` |
+| [`Script/kf_meas.bat`](Script/kf_meas.bat) | 抬噪声测量列舰队 + ×1.15 四档 | 写出 `Data/grid_noisy`，100 轮，底板按 7 mV 算 |
 | [`Script/kf_dr0.bat`](Script/kf_dr0.bat) | \(\delta R_0\)：MLP \(R_0\) ×1.2，开关对照 | `run.py --best --r0-scale 1.2` 与 `--dr0` |
 | [`Script/kf_neg.bat`](Script/kf_neg.bat) | 小时级负例 + 门控 | `nmc100ah_ecm_gen_long.py` 再 `run.py` |
 | [`Script/kf_q90.bat`](Script/kf_q90.bat) | \(q=0.90\) 网格 + 四档 | `gen_grid --soh 0.90` 再 `compare.py` |

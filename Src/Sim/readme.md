@@ -125,7 +125,10 @@ python Src/Sim/nmc100ah_ecm_gen_grid.py
 python Src/Sim/nmc100ah_ecm_gen_grid.py --n-soc 5 --n-temp 5
 python Src/Sim/nmc100ah_ecm_gen_grid.py --dry-run
 python Src/Sim/nmc100ah_ecm_gen_grid.py --out-dir Data/soh_k115 --r0-scale 1.15 --r1-scale 1.15
+python Src/Sim/nmc100ah_ecm_gen_grid.py --out-dir Data/grid_noisy --n-soc 10 --n-temp 10 --noise-voltage 0.007 --noise-current 0.1 --noise-temp 0.5 --noise-soc 0.005
 ```
+
+加大噪声写到**新目录**，不要改默认 `Data/grid/`。`--noise-voltage` 单位是伏特（0.007 = 7 mV）。
 
 `--r0-scale` / `--r1-scale` 把解析 \(R\) 整张乘常数后再仿真，用来造换对象 / 假老化。必须换 `--out-dir`，不要写回 `Data/grid/`。
 
