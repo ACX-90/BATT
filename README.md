@@ -22,6 +22,7 @@ Powered by SpaceXAI Grok 4.6
 | [`Src/Plot/`](Src/Plot/readme.md) | \(R_0/R_1/C_1\) 曲面与仿真波形 |
 | [`Src/AI/MLP/`](Src/AI/MLP/readme.md) | 物理信息 MLP：电压误差穿过可微 ECM |
 | [`Src/AI/KF/`](Src/AI/KF/readme.md) | EKF 估 SOC，ECM 出端电压，开环误差离线增量 |
+| [`Src/MCU_Eval/`](Src/MCU_Eval/readme.md) | 拷到英飞凌工程测 TC4D7 周期与负载（`Doc/05-c`） |
 | [`Doc/`](Doc/) | 参数规范、特性说明、MLP 方案推导 |
 | `Data/` | 仿真 CSV、网格数据、训练产物（默认 gitignore） |
 | `Fig/` | 出图 PNG（gitignore） |
@@ -212,6 +213,8 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Doc/04-b-增量学习应用手册.md`](Doc/04-b-增量学习应用手册.md) | 增量怎么用：按任务选档、门控、验收、现场流程 |
 | [`Doc/04-c-第0期实验汇报.md`](Doc/04-c-第0期实验汇报.md) | 第 0 期结题汇报（可分享）：完成度、八组读法、带走的规则 |
 | [`Doc/05-a-车上增量约束评估.md`](Doc/05-a-车上增量约束评估.md) | 车上增量：无 OTA、数据不外发、单 MCU 资源信封；第 1 期按此设计 |
+| [`Doc/05-b-车上增量方案头脑风暴.md`](Doc/05-b-车上增量方案头脑风暴.md) | 信封里还可能的增量路子；主线仍是 \(k\) 网格 |
+| [`Doc/05-c-TC4D7资源与负载评估.md`](Doc/05-c-TC4D7资源与负载评估.md) | TC4D7 资源与 10 Hz 负载；测法与回填表 |
 | [`Doc/A0-a-TC4D7-PPU与800V系统融合评估.md`](Doc/A0-a-TC4D7-PPU与800V系统融合评估.md) | TC4D7+PPU、800 V 包上按 demo 评估，再谈优化 |
 | [`Doc/A0-b-ST与NXP的AI-MCU对照.md`](Doc/A0-b-ST与NXP的AI-MCU对照.md) | ST P3E / NXP S32K37·K5 与英飞凌 TC4D7 对照 |
 

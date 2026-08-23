@@ -1,0 +1,61 @@
+mcu_eval init cpu_hz=400000000 dt=0.100 n_cell=180 log_B=65536
+---- algo=ecm1 ----
+payload_B=0 count_as=rom
+step n_iter=2000 n_cell=1 cyc_min=173 cyc_avg=217.5 load_pct_at_400Hz_100ms=0.0005
+sink=7167.708984
+---- algo=ekf_s_up ----
+state_B=40 count_as=ram
+step n_iter=1500 n_cell=1 cyc_min=219 cyc_avg=287.8 load_pct_at_400Hz_100ms=0.0007
+sink=87.741302
+---- algo=ekf_s_up_dr0 ----
+state_B=40 count_as=ram
+step n_iter=1500 n_cell=1 cyc_min=195 cyc_avg=277.9 load_pct_at_400Hz_100ms=0.0007
+sink=87.741302
+---- algo=k_global ----
+per_cell_B=8 count_as=ram
+apply n_iter=3000 n_cell=1 cyc_min=14 cyc_avg=27.7 load_pct_at_400Hz_100ms=0.0001
+sink=5.002499104
+---- algo=k_grid_5x4 ----
+per_cell_B=160 count_as=ram
+n_node=20 n_k=40
+interp_apply n_iter=2000 n_cell=1 cyc_min=22 cyc_avg=51.6 load_pct_at_400Hz_100ms=0.0001
+sink=2.904419661 pack180_B=28800
+---- algo=pulse_dU_dI_k0 ----
+per_cell_B=4 count_as=ram
+step n_iter=3000 n_cell=1 cyc_min=15 cyc_avg=19.1 load_pct_at_400Hz_100ms=0.0000
+sink=3000.000000
+---- algo=head_3x8x2 ----
+weights_B=200 count_as=rom
+n_param=50 per_cell_head=18floats
+fwd n_iter=2000 n_cell=1 cyc_min=183 cyc_avg=240.1 load_pct_at_400Hz_100ms=0.0006
+sink=-11.777268410
+---- algo=mlp_3x16x16x2 ----
+weights_B=1504 count_as=rom
+n_param=370 note=random_init_count_as_rom
+fwd n_iter=800 n_cell=1 cyc_min=1528 cyc_avg=2100.3 load_pct_at_400Hz_100ms=0.0053
+sink=1109.912109375
+---- algo=mlp_3x64x64x2 ----
+weights_B=18208 count_as=rom
+n_param=4546 note=random_init_now_in_bss_count_as_rom
+fwd n_iter=400 n_cell=1 cyc_min=9253 cyc_avg=10352.2 load_pct_at_400Hz_100ms=0.0259
+sink=555.165100098
+---- algo=incr_kgrid_win100 ----
+scratch_grad_B=160 count_as=ram
+win=100 note=not_in_10Hz_loop
+window_sgd n_iter=40 n_cell=1 cyc_min=3921 cyc_avg=3978.0 load_pct_at_400Hz_100ms=0.0099
+sink=41.083019
+---- algo=sox_cell_mlp64_kgrid_ekf ----
+mlp_weights_B=18208 count_as=rom
+kgrid_B=160 count_as=ram
+ekf_B=40 count_as=ram
+tick_1cell n_iter=200 n_cell=1 cyc_min=9771 cyc_avg=11008.1 load_pct_at_400Hz_100ms=0.0275
+tick_if_180seq n_iter=200 n_cell=180 cyc_min=9771 cyc_avg=11008.1 load_pct_at_400Hz_100ms=4.9536
+sink=179.275253
+---- algo=sox_pack180_mlp64_kgrid_ekf ----
+mlp_weights_shared_B=18208 count_as=rom
+kgrid_all_B=28800 count_as=ram
+ekf_all_B=7200 count_as=ram
+logbuf_eval_only_B=65536 count_as=ram_subtract
+tick_pack180 n_iter=20 n_cell=1 cyc_min=1713514 cyc_avg=1876669.9 load_pct_at_400Hz_100ms=4.6917
+sink=1.000054
+---- done log_len=2428 ----

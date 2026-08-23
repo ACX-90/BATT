@@ -1,0 +1,11 @@
+ekf reset
+ekf header
+ekf warmup
+warm 0 s=0.621056
+warm 1 s=0.620702
+warm 2 s=0.619700
+warm 3 s=0.619327
+warm 4 s=0.618333
+warm 5 s=0.617978
+warm 6 s=0.617071
+warm 7 s=0.616734
