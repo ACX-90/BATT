@@ -56,6 +56,16 @@ void McuEval_KGrid_Apply(const McuKGrid *g, float soc, float t_c, float r0, floa
 void McuEval_KGrid_InterpW(float soc, float t_c, int *is, int *it, float *ws, float *wt);
 void McuEval_KGrid_Bench(void);
 
+void McuEval_Lut2_Init(void);
+void McuEval_Lut2_Forward(float soc, float t_c, float *r0, float *r1);
+unsigned McuEval_Lut2_WeightBytes(void);
+void McuEval_Lut2_Bench(void);
+
+void McuEval_Lut3_Init(void);
+void McuEval_Lut3_Forward(float i_a, float soc, float t_c, float *r0, float *r1);
+unsigned McuEval_Lut3_WeightBytes(void);
+void McuEval_Lut3_Bench(void);
+
 void McuEval_Ecm_Bench(void);
 void McuEval_PulseR0_Bench(void);
 void McuEval_IncrKGrid_Bench(void);

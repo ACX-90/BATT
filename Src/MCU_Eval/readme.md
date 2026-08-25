@@ -20,7 +20,7 @@ McuEval_Mlp64_Bench();   /* 或其它 *_Bench */
 
 | 测这个 | 还要一起加的算法 .c |
 |--------|---------------------|
-| `eval_ecm.c` / `eval_ekf.c` / `eval_mlp64.c` / `eval_mlp16.c` / `eval_head3x8x2.c` / `eval_k_global.c` / `eval_k_grid.c` / `eval_pulse_r0.c` | 无 |
+| `eval_ecm.c` / `eval_ekf.c` / `eval_mlp64.c` / `eval_mlp16.c` / `eval_lut.c`（`lut2d_21x13` / `lut3d_9x11x9`） / `eval_head3x8x2.c` / `eval_k_global.c` / `eval_k_grid.c` / `eval_pulse_r0.c` | 无 |
 | `eval_incr_kgrid.c` | `eval_k_grid.c` |
 | `eval_sox_cell.c` / `eval_sox_pack.c` | `eval_mlp64.c` `eval_ekf.c` `eval_k_grid.c` |
 

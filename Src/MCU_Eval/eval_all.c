@@ -15,6 +15,8 @@ int main(void)
     McuEval_PulseR0_Bench();
     McuEval_Head382_Bench();
     McuEval_Mlp16_Bench();
+    McuEval_Lut2_Bench();
+    McuEval_Lut3_Bench();
     McuEval_Mlp64_Bench();
     McuEval_IncrKGrid_Bench();
     McuEval_SoxCell_Bench();

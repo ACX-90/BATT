@@ -28,6 +28,8 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 | `ecm.py` | 与 `nmc100ah_ecm_gen.py` 相同的离散化，可反传 |
 | `dataset.py` | 读 `Data/grid/*.csv` |
 | `train.py` | 预热 + 电压训练 |
+| `distill.py` | 64×64 教师 → 小网（默认 16×16） |
+| `bake_lut.py` | 64×64 烤成 \((I,s,T)\) 查找表 |
 | `infer.py` | 单条轨迹推理、可选画图 |
 | `test.py` | 用 `nmc100ah_ecm_sim.csv` 对照电压与 \(R_0,R_1\) |
 
@@ -53,6 +55,9 @@ python Src/AI/MLP/train.py --list-ckpts
 python Src/AI/MLP/train.py --fresh --epochs 40
 python Src/AI/MLP/train.py --scheme A --out-dir Data/ai_mlp_A
 python Src/AI/MLP/train.py --scheme B --epochs 100 --data-dir Data/grid_noisy --out-dir Data/ai_mlp_meas --use-meas-inputs --fresh
+python Src/AI/MLP/train.py --scheme B --hidden 16 16 --out-dir Data/ai_mlp_h16 --epochs 100 --fresh
+python Src/AI/MLP/distill.py --teacher-dir Data/ai_mlp --hidden 16 16 --out-dir Data/ai_mlp_h16_kd --epochs 100
+python Src/AI/MLP/bake_lut.py --teacher-dir Data/ai_mlp --out-dir Data/ai_mlp_lut
 ```
 
 **默认是从头训。** 每个电压 epoch 会另存 `Data/ai_mlp/ckpts/epoch_00012.pt`，同时更新 `last.pt` / `best.pt`。

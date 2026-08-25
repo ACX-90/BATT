@@ -311,6 +311,13 @@ def parse_args() -> tuple[TrainConfig, argparse.Namespace]:
     p.add_argument("--data-dir", default=None)
     p.add_argument("--out-dir", default=None)
     p.add_argument("--tbptt", type=int, default=None)
+    p.add_argument(
+        "--hidden",
+        type=int,
+        nargs="+",
+        default=None,
+        help="隐层宽度，例如 --hidden 16 16。默认 64 64",
+    )
     p.add_argument("--device", default=None)
     p.add_argument("--no-pretrain", action="store_true")
     p.add_argument("--resume", action="store_true", help="从已有权重接着训，默认最新 epoch")
@@ -345,6 +352,10 @@ def parse_args() -> tuple[TrainConfig, argparse.Namespace]:
         cfg.out_dir = args.out_dir
     if args.tbptt is not None:
         cfg.tbptt = args.tbptt
+    if args.hidden is not None:
+        if any(h <= 0 for h in args.hidden):
+            raise ValueError("--hidden 每层必须 > 0")
+        cfg.hidden = tuple(args.hidden)
     if args.device is not None:
         cfg.device = args.device
     elif torch.cuda.is_available():

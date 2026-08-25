@@ -35,11 +35,13 @@
 |------|------|
 | `ocv.py` | 与仿真相同的 OCV 表、\(\partial U_{\mathrm{ocv}}/\partial s\)、反查 |
 | `ekf.py` | 二维 EKF，可选慢变 \(\delta R_0\) |
-| `adapter.py` | MLP 逐步出参；缩放适配 \(k_0,k_1\) |
+| `adapter.py` | MLP 逐步出参；缩放适配 \(k_0,k_1\)；5×4 \(k\) 网格 |
 | `filter.py` | 闭环滤波 + 开环对照 |
 | `gate.py` | 增量门控 |
 | `run.py` | 单条轨迹闭环 |
 | `increment.py` | 离线增量：Replay / 缩放 / 只微调 / 合集重训 |
+| `window.py` | 车上滑窗：冻 MLP，SGD 只动全局 \(k_0,k_1\)，无 Replay |
+| `kgrid.py` | 车上滑窗：\((s,T)\) 上 5×4 \(k\) 网格（1b） |
 | `compare.py` | 四档对照：冻结 / 重训 / Replay / 微调 / 缩放 |
 | `hole.py` | 任务 B：挖掉温区、另训洞舰队、再跑四档 |
 
@@ -143,6 +145,13 @@ python Src/AI/KF/run.py --best --csv Data/rc2/common.csv
 ```
 
 读数见 `Doc/04-a` §7.6–§7.7。不要用 2RC 电压去增量 1RC MLP。
+
+车上滑窗（第 1 期 1a，无 Replay、SGD、10 s 窗）见 [`Doc/05-d`](../../Doc/05-d-车上增量精度评估.md)：
+
+```powershell
+python Src/AI/KF/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_kf/window_k115 --win 100 --lr 10 --passes 1
+python Src/AI/KF/kgrid.py --exp both --make-cold --win 100 --lr 10 --passes 1
+```
 
 权重写到 `Data/ai_kf/incr/`，**不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 

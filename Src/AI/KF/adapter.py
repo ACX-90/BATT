@@ -79,6 +79,84 @@ class MlpParamProvider:
         )
 
 
+# 与 Src/MCU_Eval/eval_k_grid.c 同一套出厂节点
+KGRID_SOC = (0.10, 0.30, 0.50, 0.70, 0.90)
+KGRID_T = (-10.0, 10.0, 30.0, 50.0)
+
+
+class KGridAdapter(nn.Module):
+    """冻 MLP，(SOC,T) 上双线性 k0/k1。没点到的节点保持 1。"""
+
+    def __init__(
+        self,
+        base: ParamMLP,
+        *,
+        soc_node: tuple[float, ...] = KGRID_SOC,
+        t_node: tuple[float, ...] = KGRID_T,
+    ) -> None:
+        super().__init__()
+        self.base = base
+        for p in self.base.parameters():
+            p.requires_grad = False
+        self.register_buffer("soc_node", torch.tensor(soc_node, dtype=torch.float32))
+        self.register_buffer("t_node", torch.tensor(t_node, dtype=torch.float32))
+        ns, nt = len(soc_node), len(t_node)
+        self.log_k0 = nn.Parameter(torch.zeros(ns, nt))
+        self.log_k1 = nn.Parameter(torch.zeros(ns, nt))
+
+    def _corners(self, soc: torch.Tensor, t_c: torch.Tensor) -> tuple[torch.Tensor, ...]:
+        s_ax = self.soc_node
+        t_ax = self.t_node
+        soc = soc.clamp(s_ax[0], s_ax[-1])
+        t_c = t_c.clamp(t_ax[0], t_ax[-1])
+        is_ = torch.searchsorted(s_ax, soc, right=True) - 1
+        it_ = torch.searchsorted(t_ax, t_c, right=True) - 1
+        is_ = is_.clamp(0, s_ax.numel() - 2)
+        it_ = it_.clamp(0, t_ax.numel() - 2)
+        s0, s1 = s_ax[is_], s_ax[is_ + 1]
+        t0, t1 = t_ax[it_], t_ax[it_ + 1]
+        ws = (soc - s0) / (s1 - s0).clamp_min(1e-6)
+        wt = (t_c - t0) / (t1 - t0).clamp_min(1e-6)
+        return is_, it_, ws, wt
+
+    def interp_k(self, log_k: torch.Tensor, soc: torch.Tensor, t_c: torch.Tensor) -> torch.Tensor:
+        is_, it_, ws, wt = self._corners(soc, t_c)
+        k = torch.exp(log_k)
+        k00 = k[is_, it_]
+        k10 = k[is_ + 1, it_]
+        k01 = k[is_, it_ + 1]
+        k11 = k[is_ + 1, it_ + 1]
+        return (1.0 - ws) * (1.0 - wt) * k00 + ws * (1.0 - wt) * k10 + (1.0 - ws) * wt * k01 + ws * wt * k11
+
+    def forward(
+        self,
+        x_norm: torch.Tensor,
+        soc: torch.Tensor,
+        t_c: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        r0, r1, c1 = self.base(x_norm)
+        k0 = self.interp_k(self.log_k0, soc, t_c)
+        k1 = self.interp_k(self.log_k1, soc, t_c)
+        return r0 * k0, r1 * k1, c1
+
+    def k_tables(self) -> dict[str, list]:
+        with torch.no_grad():
+            return {
+                "soc_node": self.soc_node.cpu().tolist(),
+                "t_node": self.t_node.cpu().tolist(),
+                "k0": torch.exp(self.log_k0).cpu().tolist(),
+                "k1": torch.exp(self.log_k1).cpu().tolist(),
+            }
+
+    def k_at(self, soc: float, t_c: float) -> tuple[float, float]:
+        s = torch.tensor(soc, dtype=self.log_k0.dtype, device=self.log_k0.device)
+        t = torch.tensor(t_c, dtype=self.log_k0.dtype, device=self.log_k0.device)
+        with torch.no_grad():
+            k0 = float(self.interp_k(self.log_k0, s, t))
+            k1 = float(self.interp_k(self.log_k1, s, t))
+        return k0, k1
+
+
 class ScaleAdapter(nn.Module):
     """冻住 MLP，只学 R0'=k0 R0、R1'=k1 R1（Doc/03-a §3.5）。"""
 

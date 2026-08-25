@@ -8,6 +8,7 @@ gcc -O2 -std=c99 -Wall -Isrc/MCU_Eval -ISrc/MCU_Eval ^
   Src/MCU_Eval/eval_ekf.c ^
   Src/MCU_Eval/eval_mlp64.c ^
   Src/MCU_Eval/eval_mlp16.c ^
+  Src/MCU_Eval/eval_lut.c ^
   Src/MCU_Eval/eval_head3x8x2.c ^
   Src/MCU_Eval/eval_k_global.c ^
   Src/MCU_Eval/eval_k_grid.c ^
