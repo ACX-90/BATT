@@ -2,6 +2,12 @@
 
     python Src/Sim/nmc100ah_ecm_gen_long.py
     python Src/Sim/nmc100ah_ecm_gen_long.py --only cc_rest
+    --only 是指定生成序列，可选：
+        cc_rest     放电静置
+        chg_park    充电静置
+        fchg_park   快充静置
+        schg_park   超充静置
+        loop        循环
 """
 
 from __future__ import annotations
@@ -28,6 +34,20 @@ SEQ_CHG_PARK = [
     {"mode": "rest", "duration_s": 30.0},
     {"mode": "charge", "duration_s": 2400.0, "c_rate": 1.0},
     {"mode": "rest", "duration_s": 7200.0},
+]
+
+# 负例 B：2C 充电 20 min + 停车 1 h。
+SEQ_FCHG_PARK = [
+    {"mode": "rest", "duration_s": 30.0},
+    {"mode": "charge", "duration_s": 1200.0, "c_rate": 2.0},
+    {"mode": "rest", "duration_s": 3600.0},
+]
+
+# 负例 B：4C 充电 10 min + 停车 1 h。
+SEQ_SCHG_PARK = [
+    {"mode": "rest", "duration_s": 30.0},
+    {"mode": "charge", "duration_s": 600.0, "c_rate": 4.0},
+    {"mode": "rest", "duration_s": 3600.0},
 ]
 
 SEQ_CHG_DIS_LOOP = [ {"mode": "rest", "duration_s": 30.0}, ] + \
@@ -58,6 +78,20 @@ CASES = {
         "soc0": 0.30,
         "seed": 20260832,
         "tag": "F-chg_park",
+    },
+    "fchg_park": {
+        "out": "Data/long/fchg_park.csv",
+        "sequence": SEQ_FCHG_PARK,
+        "soc0": 0.20,
+        "seed": 20260833,
+        "tag": "F-Fchg_park",
+    },
+    "schg_park": {
+        "out": "Data/long/schg_park.csv",
+        "sequence": SEQ_SCHG_PARK,
+        "soc0": 0.10,
+        "seed": 20260834,
+        "tag": "F-Schg_park",
     },
     "loop": {
         "out": "Data/long/loop.csv",
