@@ -2,6 +2,7 @@
 Data/*
 !Data/ai_mlp/
 Fig/
+!Doc/Fig/
 
 # Data/ai_mlp：先全忽略，再放行小文件和非 epoch 的 pt
 Data/ai_mlp/**
