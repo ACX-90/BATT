@@ -149,8 +149,8 @@ python Src/AI/KF/run.py --best --csv Data/rc2/common.csv
 车上滑窗（第 1 期 1a，无 Replay、SGD、10 s 窗）见 [`Doc/05-d`](../../Doc/05-d-车上增量精度评估.md)：
 
 ```powershell
-python Src/AI/KF/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_kf/window_k115 --win 100 --lr 10 --passes 1
-python Src/AI/KF/kgrid.py --exp both --make-cold --win 100 --lr 10 --passes 1
+python Src/AI/EV_Local/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_local/window_k115 --win 100 --lr 10 --passes 1
+python Src/AI/EV_Local/kgrid.py --exp both --make-cold --win 100 --lr 10 --passes 1
 ```
 
 权重写到 `Data/ai_kf/incr/`，**不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：

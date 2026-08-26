@@ -2,9 +2,9 @@
 
 仓库根目录：
 
-    python Src/AI/KF/kgrid.py --exp a
-    python Src/AI/KF/kgrid.py --exp cold --make-cold
-    python Src/AI/KF/kgrid.py --exp both --make-cold
+    python Src/AI/EV_Local/kgrid.py --exp a
+    python Src/AI/EV_Local/kgrid.py --exp cold --make-cold
+    python Src/AI/EV_Local/kgrid.py --exp both --make-cold
 
 不覆盖 Data/ai_mlp / Data/grid / Data/soh_k115。
 """
@@ -538,8 +538,8 @@ def main() -> None:
     p.add_argument("--new-dir", default="Data/soh_k115")
     p.add_argument("--cold-dir", default="Data/soh_cold_tm10")
     p.add_argument("--old-dir", default="Data/grid")
-    p.add_argument("--out-a", default="Data/ai_kf/kgrid_k115")
-    p.add_argument("--out-cold", default="Data/ai_kf/kgrid_cold")
+    p.add_argument("--out-a", default="Data/ai_local/kgrid_k115")
+    p.add_argument("--out-cold", default="Data/ai_local/kgrid_cold")
     p.add_argument("--make-cold", action="store_true")
     p.add_argument("--win", type=int, default=100)
     p.add_argument("--lr", type=float, default=10.0)

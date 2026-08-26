@@ -2,7 +2,7 @@
 
 仓库根目录：
 
-    python Src/AI/KF/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_kf/window_k115
+    python Src/AI/EV_Local/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_local/window_k115
 
 不覆盖 Data/ai_mlp / Data/grid。更新路径不读旧网格。
 """
@@ -345,7 +345,7 @@ def main() -> None:
     p.add_argument("--mlp-dir", default="Data/ai_mlp")
     p.add_argument("--new-dir", default="Data/soh_k115")
     p.add_argument("--old-dir", default="Data/grid")
-    p.add_argument("--out-dir", default="Data/ai_kf/window_k115")
+    p.add_argument("--out-dir", default="Data/ai_local/window_k115")
     p.add_argument("--win", type=int, default=100, help="窗长，步；100=10 s")
     p.add_argument("--lr", type=float, default=10.0)
     p.add_argument("--passes", type=int, default=1, help="新年份扫几遍；车上默认 1")
