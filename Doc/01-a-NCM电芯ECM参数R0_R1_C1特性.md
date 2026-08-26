@@ -162,6 +162,8 @@ NCM 相对 LFP 的整体差别：
 R_{0}(T) = R_{0,\mathrm{ref}} \cdot \exp\left[\frac{E_{a,0}}{R}\left(\frac{1}{T}-\frac{1}{T_{\mathrm{ref}}}\right)\right]
 \]
 
+<div align="center"><img src="Fig/01-a-3_3-R0-vs-T.png" alt="图 §3.3 R0 随温度变化 (Arrhenius)" width="480"/></div>
+
 | 项目 | 典型范围 |
 |------|----------|
 | 表观活化能 \(E_{a,0}\) | 约 15–35 kJ/mol（低于 \(R_{1}\)） |
@@ -255,6 +257,8 @@ Tran 等对锂离子电池综合 ECM 的结论与 NCM 实验一致：**SOH 下�
 U_{p}(t) = I R_{1}\left(1-e^{-t/\tau_{1}}\right) + U_{p}(0)\,e^{-t/\tau_{1}}
 \]
 
+<div align="center"><img src="Fig/01-a-4_1-Up-vs-t.png" alt="图 §4.1 极化电压动态 (U_p(t))" width="480"/></div>
+
 脉冲足够长时，稳态极化压降 \(\approx IR_{1}\)。
 
 ### 4.2 随 SOC（强于 R0）
@@ -276,6 +280,8 @@ U_{p}(t) = I R_{1}\left(1-e^{-t/\tau_{1}}\right) + U_{p}(0)\,e^{-t/\tau_{1}}
 R_{1}(T) = R_{1,\mathrm{ref}} \cdot \exp\left[\frac{E_{a,1}}{R}\left(\frac{1}{T}-\frac{1}{T_{\mathrm{ref}}}\right)\right]
 \]
 
+<div align="center"><img src="Fig/01-a-4_3-R1-vs-T.png" alt="图 §4.3 R1 随温度变化 (Arrhenius, 高活化能)" width="480"/></div>
+
 | 项目 | 典型范围 |
 |------|----------|
 | 表观活化能 \(E_{a,1}\) | 约 30–60 kJ/mol（高于 \(R_{0}\)） |
@@ -293,6 +299,8 @@ R_{1}(T) = R_{1,\mathrm{ref}} \cdot \exp\left[\frac{E_{a,1}}{R}\left(\frac{1}{T}
 \[
 R_{\mathrm{ct,eff}}(I) \propto \frac{\eta}{i_{0}\sinh(\alpha F\eta / RT)}
 \]
+
+<div align="center"><img src="Fig/01-a-4_4-Butler-Volmer.png" alt="图 §4.4 表观 R1 随电流变化 (Butler–Volmer)" width="480"/></div>
 
 因此：
 

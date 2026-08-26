@@ -190,3 +190,65 @@ class ScaleAdapter(nn.Module):
             wrap.log_k0.data.fill_(float(np.log(max(float(blob.get("k0", 1.0)), 1e-12))))
             wrap.log_k1.data.fill_(float(np.log(max(float(blob.get("k1", 1.0)), 1e-12))))
         return wrap
+
+
+def phi_from_mlp(mlp: ParamMLP) -> nn.Sequential:
+    """3×8×2 的前层（Linear+GELU），输出 8 维特征。"""
+    kids = list(mlp.net.children())
+    if len(kids) < 2 or not isinstance(kids[-1], nn.Linear):
+        raise ValueError("ParamMLP 末层不是 Linear，抽不出 φ")
+    last_h = [m for m in kids[:-1] if isinstance(m, nn.Linear)]
+    if not last_h or int(last_h[-1].out_features) != 8:
+        raise ValueError(f"残差头 φ 必须是 8 维隐层，得到 {[int(m.out_features) for m in last_h]}")
+    phi = nn.Sequential(*kids[:-1])
+    for p in phi.parameters():
+        p.requires_grad = False
+    return phi
+
+
+class ResidualHeadAdapter(nn.Module):
+    """冻舰队 MLP 与 3×8 前层，只训 8→2（18 个数）。
+
+    R = f_fleet + dr_max * tanh(W φ + b)，头清零时 ΔR≡0（Doc/03-d 式 (6)）。
+    """
+
+    def __init__(self, fleet: ParamMLP, phi: nn.Module, *, dr_max: float = 2.0e-3) -> None:
+        super().__init__()
+        self.fleet = fleet
+        for p in self.fleet.parameters():
+            p.requires_grad = False
+        self.phi = phi
+        for p in self.phi.parameters():
+            p.requires_grad = False
+        last_h = [m for m in phi.modules() if isinstance(m, nn.Linear)]
+        if not last_h or int(last_h[-1].out_features) != 8:
+            raise ValueError("φ 末维必须是 8")
+        self.head = nn.Linear(8, 2)
+        nn.init.zeros_(self.head.weight)
+        nn.init.zeros_(self.head.bias)
+        self.dr_max = float(dr_max)
+        self.r0_min = float(fleet.r0_min)
+        self.r1_min = float(fleet.r1_min)
+
+    def trainable_parameters(self) -> list[nn.Parameter]:
+        return list(self.head.parameters())
+
+    def n_trainable(self) -> int:
+        return int(sum(p.numel() for p in self.trainable_parameters()))
+
+    def delta(self, x_norm: torch.Tensor) -> torch.Tensor:
+        h = self.phi(x_norm)
+        z = self.head(h)
+        return self.dr_max * torch.tanh(z)
+
+    def forward(self, x_norm: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        r0, r1, c1 = self.fleet(x_norm)
+        d = self.delta(x_norm)
+        r0 = (r0 + d[..., 0]).clamp_min(self.r0_min)
+        r1 = (r1 + d[..., 1]).clamp_min(self.r1_min)
+        return r0, r1, c1
+
+    def delta_at(self, x_norm: torch.Tensor) -> tuple[float, float]:
+        with torch.no_grad():
+            d = self.delta(x_norm.reshape(1, 3)).reshape(2)
+        return float(d[0]), float(d[1])

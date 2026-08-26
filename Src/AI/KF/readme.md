@@ -35,13 +35,14 @@
 |------|------|
 | `ocv.py` | 与仿真相同的 OCV 表、\(\partial U_{\mathrm{ocv}}/\partial s\)、反查 |
 | `ekf.py` | 二维 EKF，可选慢变 \(\delta R_0\) |
-| `adapter.py` | MLP 逐步出参；缩放适配 \(k_0,k_1\)；5×4 \(k\) 网格 |
+| `adapter.py` | MLP 逐步出参；缩放适配 \(k_0,k_1\)；5×4 \(k\) 网格；3×8×2 残差头 |
 | `filter.py` | 闭环滤波 + 开环对照 |
 | `gate.py` | 增量门控 |
 | `run.py` | 单条轨迹闭环 |
 | `increment.py` | 离线增量：Replay / 缩放 / 只微调 / 合集重训 |
-| `window.py` | 车上滑窗：冻 MLP，SGD 只动全局 \(k_0,k_1\)，无 Replay |
-| `kgrid.py` | 车上滑窗：\((s,T)\) 上 5×4 \(k\) 网格（1b） |
+| `../EV_Local/window.py` | 车上滑窗：冻 MLP，SGD 只动全局 \(k_0,k_1\)，无 Replay |
+| `../EV_Local/kgrid.py` | 车上滑窗：\((s,T)\) 上 5×4 \(k\) 网格（1b） |
+| `../EV_Local/head.py` | 车上滑窗：3×8×2 残差头（1c，只对照，已丢掉） |
 | `compare.py` | 四档对照：冻结 / 重训 / Replay / 微调 / 缩放 |
 | `hole.py` | 任务 B：挖掉温区、另训洞舰队、再跑四档 |
 
@@ -146,14 +147,18 @@ python Src/AI/KF/run.py --best --csv Data/rc2/common.csv
 
 读数见 `Doc/04-a` §7.6–§7.7。不要用 2RC 电压去增量 1RC MLP。
 
-车上滑窗（第 1 期 1a，无 Replay、SGD、10 s 窗）见 [`Doc/05-d`](../../Doc/05-d-车上增量精度评估.md)：
+车上滑窗（第 1 期 1a / 1b / 1c 已齐，无 Replay、SGD、10 s 窗）见 [`Doc/05-d`](../../Doc/05-d-车上增量精度评估.md)。默认 1a 全局 \(k\)，形状用 1b 网格；`head.py` 只对照，已丢掉：
 
 ```powershell
 python Src/AI/EV_Local/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_local/window_k115 --win 100 --lr 10 --passes 1
+python Src/AI/EV_Local/window.py --mlp-dir Data/ai_mlp_meas --new-dir Data/soh_k115_noisy --old-dir Data/grid_noisy --out-dir Data/ai_local/window_meas --win 100 --lr 10 --passes 1
+python Src/AI/EV_Local/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_q90 --old-dir Data/grid --out-dir Data/ai_local/window_q90 --win 100 --lr 10 --passes 1
 python Src/AI/EV_Local/kgrid.py --exp both --make-cold --win 100 --lr 10 --passes 1
+python Src/AI/EV_Local/head.py --exp both --make-phi --win 100 --lr 2 --passes 1
+python Src/AI/EV_Local/head.py --exp a --out-a Data/ai_local/head_k115_p4 --win 100 --lr 2 --passes 4
 ```
 
-权重写到 `Data/ai_kf/incr/`，**不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
+车上权重写到 `Data/ai_local/`，实验室离线增量仍写 `Data/ai_kf/incr/`，**都不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 
 ```powershell
 python Src/AI/KF/run.py --mlp-dir Data/ai_kf/incr --best

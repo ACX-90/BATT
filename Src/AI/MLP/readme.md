@@ -9,13 +9,14 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 - `Doc/03-a-MLP-ECM增量学习方案与问题.md`（续训 ≠ 增量，方案与坑）
 - `Doc/03-b-非MLP结构GRU-LSTM评估.md`（循环核不宜换点式头；滑窗多拍残差是训练协议）
 - `Doc/03-c-卡尔曼SOC与MLP-ECM融合增量学习.md`（EKF 估 SOC，开环电压误差做增量）
-- `Doc/03-d-英飞凌残差头增量学习方案评估.md`（每芯 \(\Delta R\) 头，对照缩放 / Replay）
+- `Doc/03-d-英飞凌残差头增量学习方案评估.md`（每芯 \(\Delta R\) 头；第 1 期 1c 已对照并丢掉）
 - `Doc/04-a-合成增量对照实验.md`（第 0 期前半对照数字）
-- `Doc/04-b-增量学习应用手册.md`（按任务选档、门控、验收）
+- `Doc/04-b-增量学习应用手册.md`（按任务选档；车上菜单见 §2.3）
+- `Doc/05-d-车上增量精度评估.md`（第 1 期：滑窗 \(k\) 留下，头丢掉）
 - `Doc/A0-a-TC4D7-PPU与800V系统融合评估.md`（TC4D7 + 800 V 包 + demo / 优化）
 - `Doc/A0-b-ST与NXP的AI-MCU对照.md`（ST / NXP 与英飞凌对照）
 
-闭环滤波和离线增量在 [`Src/AI/KF/`](../KF/readme.md)，不要在本目录的 `test.py` 里更新权重。
+闭环滤波和离线增量在 [`Src/AI/KF/`](../KF/readme.md)，车上滑窗在 [`Src/AI/EV_Local/`](../KF/readme.md)。不要在本目录的 `test.py` 里更新权重。
 
 请在**仓库根目录**运行。依赖：`numpy`、`torch`（可选 `matplotlib` 做推理图）。
 

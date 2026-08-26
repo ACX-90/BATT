@@ -249,7 +249,7 @@ f_{\mathrm{dir}}(s,I)
 
 参考点 1C 下慢极化幅度 \(I R_2=28\,\mathrm{mV}\)；对 10 s DCR 只加约 \(0.030\,\mathrm{m}\Omega\)（\(1.07\to 1.10\,\mathrm{m}\Omega\)），仍在 0.8–1.5 mΩ 带内。
 
-![NMC 100Ah 一阶 ECM 参数曲面（R0, R1, C1）](Fig/nmc100ah_ecm_surfaces.png)
+![NMC 100Ah 一阶 ECM 参数曲面（R0, R1, C1）](Fig/01-b-4-nmc100ah_ecm_surfaces.png)
 
 ---
 
