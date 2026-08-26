@@ -250,7 +250,8 @@ C = C^{\mathrm{BOL}}\cdot\bigl(1+a_C(1-q)\bigr),\ a_C<0
 | `Doc/05-a` | 车上增量约束：无 OTA、数据不外发、单 MCU 信封 |
 | `Doc/05-b` | 车上增量方案头脑风暴（主线仍是 \(k\) 网格） |
 | `Doc/05-c` | TC4D7 资源 / 负载；C 在 `Src/MCU_Eval` |
-| `Doc/05-d` | 第 1 期精度；1a / 1b 留下，1c 丢掉 |
+| `Doc/05-d` | 第 1 期精度；默认写网格，1c 丢掉 |
+| `Doc/05-e` | 第 1 期结题汇报（可分享） |
 | `Doc/A0-a` | 包级、TC4D7 |
 | `Doc/A0-b` | ST / NXP AI MCU 与 TC4D7 对照 |
 | `Src/AI/KF/increment.py` | 实验室 Replay / 缩放 / 微调（车上不走这里） |
@@ -261,4 +262,4 @@ C = C^{\mathrm{BOL}}\cdot\bigl(1+a_C(1-q)\bigr),\ a_C<0
 | `Src/AI/KF/gate.py` | 增量门控 |
 | `Src/Sim/nmc100ah_ecm*.py` | 生成器；2RC / SOH 只加在这里 |
 
-第 0 期数字在 [`Doc/04-a`](Doc/04-a-合成增量对照实验.md)，用法在 [`Doc/04-b`](Doc/04-b-增量学习应用手册.md)。车上约束在 [`Doc/05-a`](Doc/05-a-车上增量约束评估.md)。本计划只保留分期与对错标准。
+第 0 期数字在 [`Doc/04-a`](Doc/04-a-合成增量对照实验.md)，用法在 [`Doc/04-b`](Doc/04-b-增量学习应用手册.md)，汇报在 [`Doc/04-c`](Doc/04-c-第0期实验汇报.md)。车上约束在 [`Doc/05-a`](Doc/05-a-车上增量约束评估.md)，第 1 期精度在 [`Doc/05-d`](Doc/05-d-车上增量精度评估.md)，汇报在 [`Doc/05-e`](Doc/05-e-第1期实验汇报.md)。本计划只保留分期与对错标准。

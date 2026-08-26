@@ -147,7 +147,7 @@ python Src/AI/KF/run.py --best --csv Data/rc2/common.csv
 
 读数见 `Doc/04-a` §7.6–§7.7。不要用 2RC 电压去增量 1RC MLP。
 
-车上滑窗（第 1 期 1a / 1b / 1c 已齐，无 Replay、SGD、10 s 窗）见 [`Doc/05-d`](../../Doc/05-d-车上增量精度评估.md)。默认写 1b \(k\) 网格；1a 是 1×1 对照 / 节点齐了之后的加速；`head.py` 只对照，已丢掉：
+车上滑窗（第 1 期 1a / 1b / 1c 已齐，无 Replay、SGD、10 s 窗）见 [`Doc/05-d`](../../Doc/05-d-车上增量精度评估.md)，汇报 [`Doc/05-e`](../../Doc/05-e-第1期实验汇报.md)。默认写 1b \(k\) 网格；1a 是 1×1 对照 / 节点齐了之后的加速；`head.py` 只对照，已丢掉：
 
 ```powershell
 python Src/AI/EV_Local/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_local/window_k115 --win 100 --lr 10 --passes 1
