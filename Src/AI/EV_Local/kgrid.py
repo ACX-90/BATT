@@ -29,7 +29,7 @@ if str(SIM_DIR) not in sys.path:
 from KF.adapter import KGridAdapter
 from KF.config import REPO_ROOT
 from KF.increment import load_incr_sequences
-from KF.window import window_gate
+from window import window_gate
 from MLP.dataset import FeatureScaler
 from MLP.ecm import ecm_forward
 from MLP.infer import load_bundle
