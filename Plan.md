@@ -252,6 +252,7 @@ C = C^{\mathrm{BOL}}\cdot\bigl(1+a_C(1-q)\bigr),\ a_C<0
 | `Doc/05-c` | TC4D7 资源 / 负载；C 在 `Src/MCU_Eval` |
 | `Doc/05-d` | 第 1 期精度；默认写网格，1c 丢掉 |
 | `Doc/05-e` | 第 1 期结题汇报（可分享） |
+| `Doc/05-f` | 车上激励 / 采样同步暂存（不改默认门） |
 | `Doc/A0-a` | 包级、TC4D7 |
 | `Doc/A0-b` | ST / NXP AI MCU 与 TC4D7 对照 |
 | `Src/AI/KF/increment.py` | 实验室 Replay / 缩放 / 微调（车上不走这里） |
