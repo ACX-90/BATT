@@ -360,6 +360,8 @@ def main() -> None:
     p.add_argument("--device", default="cpu")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--best", action="store_true", default=True)
+    p.add_argument("--no-plot", action="store_true")
+    p.add_argument("--fig-prefix", default=None, help="默认 Fig/local/<out-dir 名>")
     args = p.parse_args()
     set_seed(args.seed)
 
@@ -489,6 +491,19 @@ def main() -> None:
         f"旧 {old0*1e3:.2f}→{last['old_rmse']*1e3:.2f} mV"
     )
     print(f"写出 {out_dir / 'window.json'}  （未覆盖 {mlp_dir / 'best.pt'}）")
+    if not args.no_plot:
+        from plot import plot_from_out
+
+        prefix = args.fig_prefix or f"local/{out_dir.name}"
+        figs = plot_from_out(
+            out_dir,
+            new_dir=new_dir,
+            mlp_dir=mlp_dir,
+            fig_prefix=prefix,
+            use_true_inputs=args.use_true_inputs,
+        )
+        for fig in figs:
+            print(f"图    {fig}")
 
 
 if __name__ == "__main__":

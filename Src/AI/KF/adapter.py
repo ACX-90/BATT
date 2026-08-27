@@ -49,16 +49,24 @@ class MlpParamProvider:
             model.eval()
         return cls(model, scaler, device=device, r0_scale=r0_scale, r1_scale=r1_scale), cfg
 
+    def _call(self, x: torch.Tensor, soc, t_c):
+        # KGridAdapter 要原始 (s,T) 做双线性，不能只吃归一化 x
+        if hasattr(self.model, "interp_k"):
+            soc_t = torch.as_tensor(soc, dtype=x.dtype, device=x.device)
+            t_t = torch.as_tensor(t_c, dtype=x.dtype, device=x.device)
+            return self.model(x, soc_t, t_t)
+        return self.model(x)
+
     @torch.no_grad()
     def params(self, i_a: float, soc: float, t_c: float) -> tuple[float, float, float]:
         feat = np.array([[i_a, soc, t_c]], dtype=float)
         xn = self.scaler.transform(feat).astype(np.float32)
         x = torch.from_numpy(xn).to(self.device)
-        r0, r1, c1 = self.model(x)
+        r0, r1, c1 = self._call(x, soc, t_c)
         return (
-            float(r0) * self.r0_scale,
-            float(r1) * self.r1_scale,
-            float(c1),
+            float(r0.reshape(-1)[0]) * self.r0_scale,
+            float(r1.reshape(-1)[0]) * self.r1_scale,
+            float(c1.reshape(-1)[0]),
         )
 
     @torch.no_grad()
@@ -71,7 +79,7 @@ class MlpParamProvider:
         feat = np.stack([i_a, soc, t_c], axis=-1).astype(float)
         xn = self.scaler.transform(feat).astype(np.float32)
         x = torch.from_numpy(xn).to(self.device)
-        r0, r1, c1 = self.model(x)
+        r0, r1, c1 = self._call(x, soc, t_c)
         return (
             r0.detach().cpu().numpy() * self.r0_scale,
             r1.detach().cpu().numpy() * self.r1_scale,
