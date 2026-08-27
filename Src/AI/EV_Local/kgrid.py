@@ -528,6 +528,19 @@ def run_exp(args, *, new_dir: Path, out_dir: Path, tag: str) -> dict:
     scaler.save(out_dir / "scaler.json")
     cfg.to_json(out_dir / "config.json")
     print(f"写出 {out_dir / 'kgrid.json'}")
+    if not args.no_plot:
+        from plot import plot_from_out
+
+        prefix = args.fig_prefix or f"local/{out_dir.name}"
+        figs = plot_from_out(
+            out_dir,
+            new_dir=new_dir,
+            mlp_dir=mlp_dir,
+            fig_prefix=prefix,
+            use_true_inputs=args.use_true_inputs,
+        )
+        for fig in figs:
+            print(f"图    {fig}")
     return meta
 
 
@@ -555,6 +568,8 @@ def main() -> None:
     p.add_argument("--use-true-inputs", action="store_true")
     p.add_argument("--device", default="cpu")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--no-plot", action="store_true")
+    p.add_argument("--fig-prefix", default=None)
     args = p.parse_args()
     set_seed(args.seed)
 

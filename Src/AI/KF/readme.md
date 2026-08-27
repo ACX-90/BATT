@@ -147,7 +147,7 @@ python Src/AI/KF/run.py --best --csv Data/rc2/common.csv
 
 读数见 `Doc/04-a` §7.6–§7.7。不要用 2RC 电压去增量 1RC MLP。
 
-车上滑窗（第 1 期 1a / 1b / 1c 已齐，无 Replay、SGD、10 s 窗）见 [`Doc/05-d`](../../Doc/05-d-车上增量精度评估.md)，汇报 [`Doc/05-e`](../../Doc/05-e-第1期实验汇报.md)。默认写 1b \(k\) 网格；1a 是 1×1 对照 / 节点齐了之后的加速；`head.py` 只对照，已丢掉：
+车上滑窗（第 1 期 1a / 1b / 1c 已齐，无 Replay、SGD、10 s 窗）见 [`Doc/05-d`](../../Doc/05-d-车上增量精度评估.md)，汇报 [`Doc/05-e`](../../Doc/05-e-第1期实验汇报.md)。默认写 1b \(k\) 网格；1a 是 1×1 对照 / 节点齐了之后的加速；`head.py` 只对照，已丢掉。精度脚本只报开环 RMSE；残差长什么样走 `plot.py`：
 
 ```powershell
 python Src/AI/EV_Local/window.py --mlp-dir Data/ai_mlp --new-dir Data/soh_k115 --old-dir Data/grid --out-dir Data/ai_local/window_k115 --win 100 --lr 10 --passes 1
@@ -157,6 +157,15 @@ python Src/AI/EV_Local/kgrid.py --exp both --make-cold --win 100 --lr 10 --passe
 python Src/AI/EV_Local/head.py --exp both --make-phi --win 100 --lr 2 --passes 1
 python Src/AI/EV_Local/head.py --exp a --out-a Data/ai_local/head_k115_p4 --win 100 --lr 2 --passes 4
 ```
+
+开环残差波形（冻结 vs 1a vs 1b，边沿 / 回弹局部，\(k\) 网格热图）：
+
+```powershell
+python Src/AI/EV_Local/plot.py
+python Src/AI/EV_Local/plot.py --exp a --csv Data/soh_k115/nmc100ah_ecm_s02_t02_soc050_T+20.csv --show
+```
+
+默认写出 `Fig/local/phase1_*.png`（开环残差 + EKF SOC / 创新 / NIS）。`window.py` / `kgrid.py` 跑完也会出图，`--no-plot` 关掉；只想开环加 `--no-kf`。
 
 车上权重写到 `Data/ai_local/`，实验室离线增量仍写 `Data/ai_kf/incr/`，**都不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 
