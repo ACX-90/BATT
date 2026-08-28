@@ -43,5 +43,4 @@
 ::   see Src/AI/MLP/readme.md
 :: =============================================================================
 
-python ./../Src/AI/MLP/test.py --show --ckpt Data/ai_mlp_meas/best.pt
-pause
+python ./../Src/AI/MLP/test.py --show --ckpt Data/ai_mlp_rc2/last.pt

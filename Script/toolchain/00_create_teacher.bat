@@ -1,0 +1,1 @@
+REM train large MLP 3x64x64x2 and may be larger

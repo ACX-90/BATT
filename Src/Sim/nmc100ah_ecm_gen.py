@@ -179,7 +179,18 @@ def _normalize_mode(mode: str) -> str:
         return "discharge"
     if key in {"charge", "chg", "cha"}:
         return "charge"
+    if key in {"dis_ramp", "chg_ramp"}:
+        return key
     raise ValueError(f"未知 mode={mode!r}")
+
+
+def _ramp_current_a(cmd: dict, capacity_ah: float) -> tuple[float, float]:
+    """返回 (i_start_a, i_end_a)。c_rate 方向由 mode 决定。"""
+    rate_start = float(cmd["c_rate_start"]) * capacity_ah
+    rate_end = float(cmd["c_rate_end"]) * capacity_ah
+    if "chg_ramp" == str(cmd["mode"]).strip().lower():
+        return -rate_start, -rate_end
+    return rate_start, rate_end
 
 
 def expand_sequence(
@@ -193,10 +204,17 @@ def expand_sequence(
     steps: list[tuple[int, str, float, float]] = []
     for idx, cmd in enumerate(sequence):
         mode = _normalize_mode(str(cmd["mode"]))
-        i_a = _cmd_current_a(cmd, capacity_ah)
         t_c = float(cmd.get("t_celsius", t_default))
-        for _ in range(_cmd_steps(cmd, dt_s)):
-            steps.append((idx, mode, i_a, t_c))
+        if "ramp" in mode:
+            i_start, i_end = _ramp_current_a(cmd, capacity_ah)
+            n = _cmd_steps(cmd, dt_s)
+            for k in range(n):
+                i_a = i_start + (i_end - i_start) * k / max(n - 1, 1)
+                steps.append((idx, mode, i_a, t_c))
+        else:
+            i_a = _cmd_current_a(cmd, capacity_ah)
+            for _ in range(_cmd_steps(cmd, dt_s)):
+                steps.append((idx, mode, i_a, t_c))
     if not steps:
         raise ValueError("SEQUENCE 为空")
     return steps

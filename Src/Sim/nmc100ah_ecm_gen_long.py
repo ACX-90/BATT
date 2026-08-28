@@ -43,12 +43,22 @@ SEQ_FCHG_PARK = [
     {"mode": "rest", "duration_s": 3600.0},
 ]
 
-# 负例 B：4C 充电 10 min + 停车 1 h。
+# 负例 B：2.9C 自定义超充序列（注意可能触发保护）
 SEQ_SCHG_PARK = [
-    {"mode": "rest", "duration_s": 30.0},
-    {"mode": "charge", "duration_s": 600.0, "c_rate": 4.0},
-    {"mode": "rest", "duration_s": 3600.0},
+    {"mode": "rest", "duration_s": 30.0}, # 0.1
+    {"mode": "chg_ramp", "duration_s": 60, "c_rate_start": 0.0, "c_rate_end": 2.9}, # 0.1-0.124
+    {"mode": "charge", "duration_s": 590, "c_rate": 2.9}, # 0.124-0.6
+    {"mode": "chg_ramp", "duration_s": 370, "c_rate_start": 2.9, "c_rate_end": 1}, # 0.6-0.8
+    {"mode": "chg_ramp", "duration_s": 600, "c_rate_start": 1, "c_rate_end": 0.3}, # 0.9+
+    {"mode": "rest", "duration_s": 600.0},
 ]
+
+# 自定义放电序列
+# Reserved
+
+# 自定义WLTC
+# Reserved
+
 
 SEQ_CHG_DIS_LOOP = [ {"mode": "rest", "duration_s": 30.0}, ] + \
 [
@@ -107,6 +117,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description="任务 F：写出小时级负例 CSV，不改默认 SEQUENCE")
     p.add_argument("--only", choices=tuple(CASES), default=None)
     p.add_argument("--no-noise", action="store_true")
+    p.add_argument("--rc2", action="store_true", help="叠加慢支路 R2C2，BMS 仍 1RC")
     args = p.parse_args()
     names = [args.only] if args.only else list(CASES)
     for name in names:
@@ -118,6 +129,7 @@ def main() -> None:
             soc0=spec["soc0"],
             noise_seed=spec["seed"],
             noise_enable=False if args.no_noise else None,
+            rc2=args.rc2,
             extra_meta=[f"# source=nmc100ah_ecm_gen_long", f"# case={name}", f"# tag={spec['tag']}"],
         )
 
