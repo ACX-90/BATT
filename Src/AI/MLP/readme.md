@@ -27,7 +27,7 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 |------|------|
 | `config.py` | 方案、学习率、\(C_1^\star\)、数据路径 |
 | `model.py` | `ParamMLP`，softplus 保证电阻电容为正 |
-| `ecm.py` | 与 `nmc100ah_ecm_gen.py` 相同的离散化，可反传 |
+| `ecm.py` | 与 `nmc100ah_gen.py` 相同的离散化，可反传 |
 | `dataset.py` | 读 `Data/grid/*.csv` |
 | `train.py` | 预热 + 电压训练 |
 | `distill.py` | 64×64 教师 → 小网（默认 16×16） |
@@ -48,7 +48,7 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 先准备网格数据：
 
 ```powershell
-python Src/Sim/nmc100ah_ecm_gen_grid.py
+python Src/Sim/nmc100ah_gen_grid.py
 python Src/AI/MLP/train.py
 python Src/AI/MLP/train.py --scheme B --epochs 40
 python Src/AI/MLP/train.py --resume --epochs 20
@@ -98,7 +98,7 @@ python Src/AI/MLP/infer.py --csv Data/grid/nmc100ah_ecm_s02_t02_soc050_T+20.csv
 
 ## 测试
 
-默认拿 `Data/nmc100ah_ecm_sim.csv`（先跑 `nmc100ah_ecm_gen.py`）对照测量电压和教师 \(R_0,R_1\)：
+默认拿 `Data/nmc100ah_ecm_sim.csv`（先跑 `nmc100ah_gen.py`）对照测量电压和教师 \(R_0,R_1\)：
 
 ```powershell
 python Src/AI/MLP/test.py

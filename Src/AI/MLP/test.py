@@ -240,7 +240,7 @@ def main() -> None:
 
     csv_path = _resolve(args.csv)
     if not csv_path.exists():
-        raise FileNotFoundError(f"找不到仿真数据: {csv_path}，请先运行 python Src/Sim/nmc100ah_ecm_gen.py")
+        raise FileNotFoundError(f"找不到仿真数据: {csv_path}，请先运行 python Src/Sim/nmc100ah_gen.py")
 
     ckpt = _pick_ckpt(out_dir, epoch=args.epoch, ckpt=args.ckpt, best=args.best)
     model, scaler, cfg = load_bundle(ckpt, out_dir / "config.json", out_dir / "scaler.json")

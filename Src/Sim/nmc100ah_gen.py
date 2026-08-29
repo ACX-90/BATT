@@ -1,4 +1,4 @@
-"""100 Ah NMC 一阶 ECM 时域仿真。
+"""100 Ah NMC 时域仿真。默认 ECM，`--pybamm` 换 SPM。
 
 按头部配置的充电 / 放电 / 静置指令序列推进电芯状态，
 步长固定为 DT_S（默认 0.1 s），测量通道叠加高斯噪声，
@@ -6,13 +6,14 @@
 
 用法（仓库根目录）：
 
-    python Src/Sim/nmc100ah_ecm_gen.py
-    python Src/Sim/nmc100ah_ecm_gen.py --out Data/my_run.csv
-    python Src/Sim/nmc100ah_ecm_gen.py --out Data/long/cc_rest.csv --soc0 0.70
+    python Src/Sim/nmc100ah_gen.py
+    python Src/Sim/nmc100ah_gen.py --out Data/my_run.csv
+    python Src/Sim/nmc100ah_gen.py --out Data/long/cc_rest.csv --soc0 0.70
+    python Src/Sim/nmc100ah_gen.py --pybamm --out Data/nmc100ah_pybamm_sim.csv
 
 其它模块不要改本文件头部的 SEQUENCE。传入可选工况：
 
-    from nmc100ah_ecm_gen import run_sim
+    from nmc100ah_gen import run_sim
     run_sim(out="Data/long/cc_rest.csv", sequence=my_seq, soc0=0.70)
 """
 
@@ -377,6 +378,7 @@ def write_csv(
     noise_std: dict[str, float],
     sequence: list[dict],
     extra_meta: list[str] | None = None,
+    source: str = "nmc100ah_gen",
 ) -> Path:
     path = Path(path)
     if not path.is_absolute():
@@ -385,7 +387,7 @@ def write_csv(
 
     n = len(data["time_s"])
     meta = [
-        f"# nmc100ah_ecm_gen",
+        f"# {source}",
         f"# dt_s={dt_s}",
         f"# n_steps={n}",
         f"# duration_s={n * dt_s:.1f}",
@@ -535,7 +537,7 @@ def _summarize(data: dict[str, np.ndarray], *, dt_s: float = DT_S) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="NMC 100Ah ECM 时域仿真，输出 Data/*.csv")
+    parser = argparse.ArgumentParser(description="NMC 100Ah 时域仿真（默认 ECM，--pybamm 换 SPM），输出 Data/*.csv")
     parser.add_argument("--out", default=OUTPUT_CSV, help="输出 CSV 路径")
     parser.add_argument("--soc0", type=float, default=None, help="覆盖头部 SOC0")
     parser.add_argument("--t-ambient", type=float, default=None, help="覆盖头部环境温度 / °C")
@@ -543,7 +545,34 @@ def main() -> None:
     parser.add_argument("--no-noise", action="store_true", help="关闭噪声")
     parser.add_argument("--soh", type=float, default=1.0, help="电阻/电容寿命因子 q，1=BOL")
     parser.add_argument("--rc2", action="store_true", help="叠加慢支路 R2C2，BMS 仍读 1RC")
+    parser.add_argument(
+        "--pybamm",
+        action="store_true",
+        help="用 PyBaMM SPM 出电压，CSV 列与 ECM 相同",
+    )
+    parser.add_argument(
+        "--thermal",
+        action="store_true",
+        help="仅 --pybamm：打开 lumped 热模型（默认等温）",
+    )
     args = parser.parse_args()
+
+    if args.thermal and not args.pybamm:
+        parser.error("--thermal 只能与 --pybamm 一起用")
+    if args.pybamm:
+        if args.rc2 or abs(args.soh - 1.0) > 1e-12:
+            parser.error("--pybamm 不能与 --rc2 / --soh 一起用")
+        from nmc100ah_pybamm import run_sim as run_pybamm
+
+        run_pybamm(
+            out=args.out,
+            soc0=args.soc0,
+            t_ambient_c=args.t_ambient,
+            noise_enable=False if args.no_noise else None,
+            noise_seed=args.seed,
+            thermal=args.thermal,
+        )
+        return
 
     run_sim(
         out=args.out,

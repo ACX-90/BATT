@@ -4,7 +4,7 @@ Powered by SpaceXAI Grok 4.6
 > 对象：100 Ah NMC，一阶 Thevenin（OCV + \(R_0\) + \(R_1\parallel C_1\)）  
 > 监督信号：只有端电压测量 \(U_t^{\mathrm{meas}}\)，**没有** \(R_0,R_1,C_1\) 标签  
 > 结构：MLP 出参数 → 物理 ECM 出电压 → 电压误差反传更新 MLP  
-> 与现有代码对齐：`Src/Sim/nmc100ah_ecm_gen.py` 的离散化  
+> 与现有代码对齐：`Src/Sim/nmc100ah_gen.py` 的离散化  
 > 阶次：解码器默认 1RC。真值若是 2RC / 更高阶，残差落到哪见 §11；数量级见 `Doc/02-b` §10、模板见 `Doc/01-b` §11
 
 本文只讲设计和推导。实现时用自动微分即可，不必手写全部雅可比；手推是为了看清梯度从哪来、哪些量可观、训练为什么会漂。
@@ -399,8 +399,8 @@ x̃_k → [MLP_θ] → z_k → softplus → R0,R1,C1
 
 ```
 Src/Sim/nmc100ah_ecm.py          解析映射，作对照与 MLP 预热标签
-Src/Sim/nmc100ah_ecm_gen.py      离散 ECM 与单条 CSV（教师 / 合成数据）
-Src/Sim/nmc100ah_ecm_gen_grid.py 多 SOC×T 轨迹，作训练集
+Src/Sim/nmc100ah_gen.py      离散 ECM 与单条 CSV（教师 / 合成数据）
+Src/Sim/nmc100ah_gen_grid.py 多 SOC×T 轨迹，作训练集
 Data/grid/*.csv                  I, T, SOC, Uocv, Ut_meas
 Doc/01-b-NMC100Ah_ECM参数规范.md   电路与因子定义
 ```

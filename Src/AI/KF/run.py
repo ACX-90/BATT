@@ -163,7 +163,7 @@ def run_one(args: argparse.Namespace) -> dict[str, np.ndarray]:
     ckpt = _pick_ckpt(mlp_dir, epoch=args.epoch, ckpt=args.ckpt, best=args.best)
     csv_path = _resolve(args.csv)
     if not csv_path.exists():
-        raise FileNotFoundError(f"找不到 {csv_path}，请先运行 python Src/Sim/nmc100ah_ecm_gen.py")
+        raise FileNotFoundError(f"找不到 {csv_path}，请先运行 python Src/Sim/nmc100ah_gen.py")
 
     kf_cfg = KfConfig(
         dt_s=args.dt,

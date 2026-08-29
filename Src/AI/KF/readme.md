@@ -110,8 +110,8 @@ python Src/AI/KF/hole.py --compare-only
 测量列舰队（任务 D）不要改 `config.py` 默认值，也不要改 `Data/grid/`。抬噪声写到新目录，100 轮即可（无噪声 100 轮底板约 7 mV，不必追 500+ 的 4 mV）：
 
 ```powershell
-python Src/Sim/nmc100ah_ecm_gen_grid.py --n-soc 10 --n-temp 10 --out-dir Data/grid_noisy --noise-voltage 0.007 --noise-current 0.1 --noise-temp 0.5 --noise-soc 0.005
-python Src/Sim/nmc100ah_ecm_gen_grid.py --n-soc 5 --n-temp 5 --out-dir Data/soh_k115_noisy --r0-scale 1.15 --r1-scale 1.15 --noise-voltage 0.007 --noise-current 0.1 --noise-temp 0.5 --noise-soc 0.005
+python Src/Sim/nmc100ah_gen_grid.py --n-soc 10 --n-temp 10 --out-dir Data/grid_noisy --noise-voltage 0.007 --noise-current 0.1 --noise-temp 0.5 --noise-soc 0.005
+python Src/Sim/nmc100ah_gen_grid.py --n-soc 5 --n-temp 5 --out-dir Data/soh_k115_noisy --r0-scale 1.15 --r1-scale 1.15 --noise-voltage 0.007 --noise-current 0.1 --noise-temp 0.5 --noise-soc 0.005
 python Src/AI/MLP/train.py --scheme B --epochs 100 --data-dir Data/grid_noisy --out-dir Data/ai_mlp_meas --use-meas-inputs --fresh
 python Src/AI/KF/compare.py --task meas --mlp-dir Data/ai_mlp_meas --new-dir Data/soh_k115_noisy --old-dir Data/grid_noisy --out-dir Data/ai_kf/compare_meas --epochs 10 --replay-n 50
 ```
@@ -130,7 +130,7 @@ python Src/AI/KF/run.py --best --r0-scale 1.2 --dr0 --out Data/ai_kf/dr0_on.csv
 小时级负例（任务 F）不要改默认 `SEQUENCE`：
 
 ```powershell
-python Src/Sim/nmc100ah_ecm_gen_long.py
+python Src/Sim/nmc100ah_gen_long.py
 python Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv
 ```
 
@@ -139,9 +139,9 @@ python Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv
 \(q=0.90\) 与 2RC（生成器升级，BMS 仍 1RC）：
 
 ```powershell
-python Src/Sim/nmc100ah_ecm_gen_grid.py --out-dir Data/soh_q90 --soh 0.90
+python Src/Sim/nmc100ah_gen_grid.py --out-dir Data/soh_q90 --soh 0.90
 python Src/AI/KF/compare.py --task aging --new-dir Data/soh_q90 --out-dir Data/ai_kf/compare_q90
-python Src/Sim/nmc100ah_ecm_gen.py --out Data/rc2/common.csv --rc2
+python Src/Sim/nmc100ah_gen.py --out Data/rc2/common.csv --rc2
 python Src/AI/KF/run.py --best --csv Data/rc2/common.csv
 ```
 

@@ -3,7 +3,7 @@ Powered by SpaceXAI Grok 4.6
 
 > 对象：一阶 Thevenin（OCV + \(R_0\) + \(R_1\parallel C_1\)），放电电流为正，\(\Delta t=0.1\,\mathrm{s}\)  
 > 对照：`Doc/02-a-MLP-ECM物理信息参数估计.md`、`Doc/02-b-MLP-ECM固定C1方案与对比.md`、`Doc/03-a-MLP-ECM增量学习方案与问题.md`、`Doc/04-a` 任务 F / H  
-> 对齐：`Src/Sim/nmc100ah_ecm_gen.py` 的离散化、`Src/AI/MLP` 方案 B（\(C_1\equiv C_1^\star\)）  
+> 对齐：`Src/Sim/nmc100ah_gen.py` 的离散化、`Src/AI/MLP` 方案 B（\(C_1\equiv C_1^\star\)）  
 > 目的：说清卡尔曼怎样用电压把 SOC 从安时积分里纠回来；MLP / ECM / KF 各管什么；电压误差里哪一段能拿去增量训 MLP  
 > 本文只做分析，不改代码
 

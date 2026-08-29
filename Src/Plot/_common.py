@@ -96,7 +96,7 @@ def load_sim_csv(path: str | Path | None = None) -> dict[str, np.ndarray]:
     if not csv_path.is_absolute():
         csv_path = REPO_ROOT / csv_path
     if not csv_path.exists():
-        raise FileNotFoundError(f"找不到仿真数据: {csv_path}，请先运行 python Src/Sim/nmc100ah_ecm_gen.py")
+        raise FileNotFoundError(f"找不到仿真数据: {csv_path}，请先运行 python Src/Sim/nmc100ah_gen.py")
 
     with csv_path.open("r", encoding="utf-8", newline="") as fh:
         body = (line for line in fh if line.strip() and not line.lstrip().startswith("#"))

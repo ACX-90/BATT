@@ -319,7 +319,7 @@ def summarize_k(tab: dict) -> dict:
 
 def make_cold_grid(out_dir: Path, *, scale: float = 1.15, cold_t: float = -10.0) -> Path:
     from nmc100ah_ecm import make_ecm
-    from nmc100ah_ecm_gen import (
+    from nmc100ah_gen import (
         DT_S,
         ENABLE_CUTOFF,
         NOISE_ENABLE,
@@ -330,7 +330,7 @@ def make_cold_grid(out_dir: Path, *, scale: float = 1.15, cold_t: float = -10.0)
         simulate,
         write_csv,
     )
-    from nmc100ah_ecm_gen_grid import _write_index, build_grid, case_name, clear_output_dir
+    from nmc100ah_gen_grid import _write_index, build_grid, case_name, clear_output_dir
 
     soc_axis, t_axis = build_grid(5, 5)
     out_dir.mkdir(parents=True, exist_ok=True)

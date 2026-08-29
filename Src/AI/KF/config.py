@@ -1,4 +1,4 @@
-"""EKF / 融合滤波配置。离散化与 Src/Sim/nmc100ah_ecm_gen.py 一致。"""
+"""EKF / 融合滤波配置。离散化与 Src/Sim/nmc100ah_gen.py 一致。"""
 
 from __future__ import annotations
 

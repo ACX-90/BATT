@@ -51,7 +51,7 @@ python Src/Sim/nmc100ah_ecm_demo.py
 ### 2. 单条工况仿真 + 出图
 
 ```powershell
-python Src/Sim/nmc100ah_ecm_gen.py
+python Src/Sim/nmc100ah_gen.py
 python Src/Plot/plot_all.py
 ```
 
@@ -63,12 +63,12 @@ python Src/Plot/plot_all.py
 | `Fig/nmc100ah_ecm_surfaces.png` | 参数曲面 |
 | `Fig/nmc100ah_ecm_waveforms.png` | 电流 / 电压 / SOC / 极化 / \(R,C,\tau\) |
 
-指令序列、噪声、初值改 `nmc100ah_ecm_gen.py` 文件头部。`--show` 弹窗，`--no-noise` 关噪声。
+指令序列、噪声、初值改 `nmc100ah_gen.py` 文件头部。`--show` 弹窗，`--no-noise` 关噪声。
 
 ### 3. 网格数据 → 训练 MLP → 推理
 
 ```powershell
-python Src/Sim/nmc100ah_ecm_gen_grid.py
+python Src/Sim/nmc100ah_gen_grid.py
 python Src/AI/MLP/train.py --scheme B --epochs 40
 python Src/AI/MLP/infer.py --best
 ```
@@ -112,8 +112,10 @@ P = P_ref · f_SOC · f_相变 · f_T · f_I · f_充放
 | `nmc100ah_ecm.py` | `NMC100AhECM.evaluate(I, T, SOC)` |
 | `nmc100ah_ecm_params.py` | 参数数据类，可读写 JSON |
 | `nmc100ah_ecm_demo.py` | 参考点复核、可选导出查找表 |
-| `nmc100ah_ecm_gen.py` | 按充/放/静置序列写一份 CSV |
-| `nmc100ah_ecm_gen_grid.py` | 默认 5×5 起始 SOC × 温度，写 `Data/grid/` |
+| `nmc100ah_gen.py` | 时域仿真入口：默认 ECM，`--pybamm` 换 SPM |
+| `nmc100ah_gen_grid.py` | 默认 5×5 起始 SOC × 温度，写 `Data/grid/`；`--pybamm --out-dir Data/grid_pybamm` |
+| `nmc100ah_gen_long.py` | 小时级负例；默认 ECM，`--pybamm` 写 `Data/long_pybamm/` |
+| `nmc100ah_pybamm.py` | PyBaMM SPM 后端，由上面三个入口的 `--pybamm` 调用 |
 
 代码里调用：
 
@@ -165,8 +167,8 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 
 | 文件 | 做什么 | 实际命令 |
 |------|--------|----------|
-| [`Script/gen_common.bat`](Script/gen_common.bat) | 单条对照工况，写出 `Data/nmc100ah_ecm_sim.csv` | `python Src/Sim/nmc100ah_ecm_gen.py` |
-| [`Script/gen_grid.bat`](Script/gen_grid.bat) | SOC×温度网格 10×10，写出 `Data/grid/`（先清旧 CSV） | `python .\Src\Sim\nmc100ah_ecm_gen_grid.py --n-soc 10 --n-temp 10` |
+| [`Script/gen_common.bat`](Script/gen_common.bat) | 单条对照工况，写出 `Data/nmc100ah_ecm_sim.csv` | `python Src/Sim/nmc100ah_gen.py` |
+| [`Script/gen_grid.bat`](Script/gen_grid.bat) | SOC×温度网格 10×10，写出 `Data/grid/`（先清旧 CSV） | `python .\Src\Sim\nmc100ah_gen_grid.py --n-soc 10 --n-temp 10` |
 | [`Script/train_100.bat`](Script/train_100.bat) | 方案 B，从头训 100 个电压 epoch | `python Src/AI/MLP/train.py --scheme B --epochs 100` |
 | [`Script/train_1000_resume.bat`](Script/train_1000_resume.bat) | 方案 B，从最新权重再训 1000 轮 | `python Src/AI/MLP/train.py --scheme B --epochs 1000 --resume` |
 | [`Script/test_mlp.bat`](Script/test_mlp.bat) | 最新权重 + `Data/nmc100ah_ecm_sim.csv`，弹窗出对照图 | `python Src/AI/MLP/test.py --show` |
@@ -176,7 +178,7 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Script/kf_hole.bat`](Script/kf_hole.bat) | 填洞：挖掉 −10 °C，另训舰队再四档对照 | `python Src/AI/KF/hole.py` |
 | [`Script/kf_meas.bat`](Script/kf_meas.bat) | 抬噪声测量列舰队 + ×1.15 四档 | 写出 `Data/grid_noisy`，100 轮，底板按 7 mV 算 |
 | [`Script/kf_dr0.bat`](Script/kf_dr0.bat) | \(\delta R_0\)：MLP \(R_0\) ×1.2，开关对照 | `run.py --best --r0-scale 1.2` 与 `--dr0` |
-| [`Script/kf_neg.bat`](Script/kf_neg.bat) | 小时级负例 + 门控 | `nmc100ah_ecm_gen_long.py` 再 `run.py` |
+| [`Script/kf_neg.bat`](Script/kf_neg.bat) | 小时级负例 + 门控 | `nmc100ah_gen_long.py` 再 `run.py` |
 | [`Script/kf_q90.bat`](Script/kf_q90.bat) | \(q=0.90\) 网格 + 四档 | `gen_grid --soh 0.90` 再 `compare.py` |
 | [`Script/kf_rc2.bat`](Script/kf_rc2.bat) | 2RC 真值、1RC 滤波 | `gen.py --rc2` 再 `run.py` |
 | [`autogit.bat`](autogit.bat) | `pull` → `add *` → `commit` → `push` | 见文件内四行 git |
@@ -196,7 +198,7 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 
 建议顺序：`Script/gen_grid.bat` → `Script/train_100.bat`（或 `Script/train_1000_resume.bat`）→ `Script/gen_common.bat` → `Script/test.bat`。
 
-`Script/gen_grid.bat` 正式跑之前会清掉 `Data/grid/` 里旧 CSV。工况序列和噪声改 `Src/Sim/nmc100ah_ecm_gen.py` 头部，网格和单条仿真共用。`Script/train_1000_resume.bat` 的 `--epochs` 是**再跑多少轮**，不是训到第几轮。`Script/test.bat` 默认用最新 `epoch_XXXXX.pt`；`--best` 改用验证集最好的那份。
+`Script/gen_grid.bat` 正式跑之前会清掉 `Data/grid/` 里旧 CSV。工况序列和噪声改 `Src/Sim/nmc100ah_gen.py` 头部，网格和单条仿真共用。`Script/train_1000_resume.bat` 的 `--epochs` 是**再跑多少轮**，不是训到第几轮。`Script/test.bat` 默认用最新 `epoch_XXXXX.pt`；`--best` 改用验证集最好的那份。
 
 ## 文档
 

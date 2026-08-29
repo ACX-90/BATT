@@ -22,7 +22,7 @@ Powered by SpaceXAI Grok 4.6
 | 温度 | \(T\) 用 °C 输入，Arrhenius 内部转开尔文 | 指电芯温度，不是环境温度 |
 | SOC | \(s \in [0,1]\) | 代码也接受 0–100 百分数 |
 
-端电压（本参数模型默认只出 \(R,C\)，时域仿真另走 `nmc100ah_ecm_gen.py`）：
+端电压（本参数模型默认只出 \(R,C\)，时域仿真另走 `nmc100ah_gen.py`）：
 
 \[
 \begin{aligned}
@@ -298,7 +298,7 @@ f_{\mathrm{dir}}(s,I)
 Src/Sim/nmc100ah_ecm_params.py   参数数据类、默认值、JSON 读写
 Src/Sim/nmc100ah_ecm.py          NMC100AhECM：evaluate / 查表 / 导出
 Src/Sim/nmc100ah_ecm_demo.py     参考点复核、典型工况、可选导出
-Src/Sim/nmc100ah_ecm_gen.py      充/放/静置时域仿真，输出 Data/*.csv
+Src/Sim/nmc100ah_gen.py          充/放/静置时域仿真，输出 Data/*.csv
 Src/Plot/plot_ecm_surfaces.py    R0/R1/C1 三维曲面
 Src/Plot/plot_sim_waveforms.py   仿真波形
 Src/Plot/plot_all.py             一次出曲面+波形
@@ -370,7 +370,7 @@ model = NMC100AhECM.from_json("my_cell.json")
 ```powershell
 python Src/Sim/nmc100ah_ecm_demo.py
 python Src/Sim/nmc100ah_ecm_demo.py --json Doc/NMC100Ah_ECM_params.json --csv Doc/NMC100Ah_ECM_lookup.csv
-python Src/Sim/nmc100ah_ecm_gen.py
+python Src/Sim/nmc100ah_gen.py
 python Src/Plot/plot_all.py
 ```
 

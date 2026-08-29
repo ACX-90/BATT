@@ -125,7 +125,7 @@ C = C^{\mathrm{BOL}}\cdot\bigl(1+a_C(1-q)\bigr),\ a_C<0
 **前半（1RC 自洽错配，实现量最小）**
 
 1. 合成差异：缩放教师电阻、挖掉某温区、可选电流零偏 / 容量错。新年份新目录。  
-   电阻缩放网格：`python Src/Sim/nmc100ah_ecm_gen_grid.py --out-dir Data/soh_k115 --r0-scale 1.15 --r1-scale 1.15`
+   电阻缩放网格：`python Src/Sim/nmc100ah_gen_grid.py --out-dir Data/soh_k115 --r0-scale 1.15 --r1-scale 1.15`
 2. 一次跑四档：全量重训、只微调、Replay、`scale`（外加冻结基线）。  
    `python Src/AI/KF/compare.py --make-new --r0-scale 1.15 --r1-scale 1.15`  
    表：旧 RMSE、新 RMSE、参考点 \(R_0/R_1\)。

@@ -100,7 +100,7 @@ def load_grid_sequences(cfg: TrainConfig) -> list[dict[str, np.ndarray]]:
         paths = sorted(data_dir.glob("*.csv"))
         paths = [p for p in paths if p.name != cfg.index_name]
     if not paths:
-        raise FileNotFoundError(f"未找到轨迹 CSV：{data_dir}，请先运行 nmc100ah_ecm_gen_grid.py")
+        raise FileNotFoundError(f"未找到轨迹 CSV：{data_dir}，请先运行 nmc100ah_gen_grid.py")
 
     i_key = "i_true_a" if cfg.use_true_inputs else "i_meas_a"
     soc_key = "soc_true" if cfg.use_true_inputs else "soc_meas"

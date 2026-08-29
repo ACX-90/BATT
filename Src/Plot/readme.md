@@ -51,7 +51,7 @@ python Src/Plot/plot_ecm_surfaces.py --show
 默认读 `Data/nmc100ah_ecm_sim.csv`。先跑仿真再画：
 
 ```powershell
-python Src/Sim/nmc100ah_ecm_gen.py
+python Src/Sim/nmc100ah_gen.py
 python Src/Plot/plot_sim_waveforms.py
 python Src/Plot/plot_sim_waveforms.py --csv Data/nmc100ah_ecm_sim.csv --show
 ```
@@ -76,7 +76,7 @@ python Src/Plot/plot_sim_waveforms.py --csv Data/grid/nmc100ah_ecm_s02_t02_soc05
 
 叠线不靠颜色硬分：真值实线、安时虚线、EKF 点划；测量实线（淡）、开环虚线、先验点划。约定在 `_common.OVERLAY`。虚线 / 点划 / 点线的 zorder 高于实线，避免被挡住。
 
-CSV 须带表头；文件头 `#` 注释会被跳过，与 `nmc100ah_ecm_gen.py` 的输出格式一致。
+CSV 须带表头；文件头 `#` 注释会被跳过，与 `nmc100ah_gen.py` 的输出格式一致。
 
 ## 读自己的 CSV
 

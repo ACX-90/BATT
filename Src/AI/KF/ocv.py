@@ -1,4 +1,4 @@
-"""NMC 100 Ah OCV 表，与 Src/Sim/nmc100ah_ecm_gen.py 同一套数。
+"""NMC 100 Ah OCV 表，与 Src/Sim/nmc100ah_gen.py 同一套数。
 
 KF 不学 OCV。dU_ocv/ds 只用于观测雅可比和平台区增益调度。
 """

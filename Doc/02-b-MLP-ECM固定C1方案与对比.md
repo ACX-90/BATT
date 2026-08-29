@@ -3,7 +3,7 @@ Powered by SpaceXAI Grok 4.6
 
 > 对照文档：`Doc/02-a-MLP-ECM物理信息参数估计.md`（下文称方案 A：MLP 出 \(R_0,R_1,C_1\)）  
 > 本文方案 B：MLP 只出 \(R_0,R_1\)，ECM 里 \(C_1\equiv C_{1}^{\star}\) 为常数  
-> 电路与离散化不变，仍与 `Src/Sim/nmc100ah_ecm_gen.py` 对齐  
+> 电路与离散化不变，仍与 `Src/Sim/nmc100ah_gen.py` 对齐  
 > 目的：说明为什么少出 \(C_1\) 往往更好训，以及会付出什么代价  
 > §10：真值 2RC / 更高阶、BMS 仍 1RC 时的误差预算（模板数见 `Doc/01-b` §11，机理见 `Doc/02-a` §11）
 

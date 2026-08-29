@@ -1,4 +1,4 @@
-"""可微一阶 Thevenin 前向，离散化与 Src/Sim/nmc100ah_ecm_gen.py 一致。"""
+"""可微一阶 Thevenin 前向，离散化与 Src/Sim/nmc100ah_gen.py 一致。"""
 
 from __future__ import annotations
 

@@ -1,12 +1,13 @@
 """小时级负例（任务 F）。默认 SEQUENCE 不动，工况从这里传入 run_sim。
 
-    python Src/Sim/nmc100ah_ecm_gen_long.py
-    python Src/Sim/nmc100ah_ecm_gen_long.py --only cc_rest
+    python Src/Sim/nmc100ah_gen_long.py
+    python Src/Sim/nmc100ah_gen_long.py --only cc_rest
+    python Src/Sim/nmc100ah_gen_long.py --only schg_park --pybamm
     --only 是指定生成序列，可选：
         cc_rest     放电静置
         chg_park    充电静置
         fchg_park   快充静置
-        schg_park   超充静置
+        schg_park   超充静置（含 chg_ramp 坡度电流）
         loop        循环
 """
 
@@ -20,7 +21,7 @@ SIM_DIR = Path(__file__).resolve().parent
 if str(SIM_DIR) not in sys.path:
     sys.path.insert(0, str(SIM_DIR))
 
-from nmc100ah_ecm_gen import run_sim
+from nmc100ah_gen import run_sim
 
 # 负例 A：0.3C 放电 2 h + 静置 30 min。SOC0=0.70，约放到 0.10。
 SEQ_CC_REST = [
@@ -118,20 +119,59 @@ def main() -> None:
     p.add_argument("--only", choices=tuple(CASES), default=None)
     p.add_argument("--no-noise", action="store_true")
     p.add_argument("--rc2", action="store_true", help="叠加慢支路 R2C2，BMS 仍 1RC")
+    p.add_argument(
+        "--pybamm",
+        action="store_true",
+        help="用 PyBaMM SPM 出电压；chg_ramp / dis_ramp 走 drive cycle，默认写 Data/long_pybamm/",
+    )
+    p.add_argument(
+        "--thermal",
+        action="store_true",
+        help="仅 --pybamm：打开 lumped 热模型（默认等温）",
+    )
+    p.add_argument("--out-dir", default=None, help="覆盖输出目录")
     args = p.parse_args()
+    if args.thermal and not args.pybamm:
+        p.error("--thermal 只能与 --pybamm 一起用")
+    if args.pybamm and args.rc2:
+        p.error("--pybamm 不能与 --rc2 一起用")
+    out_dir = args.out_dir
+    if out_dir is None and args.pybamm:
+        out_dir = "Data/long_pybamm"
     names = [args.only] if args.only else list(CASES)
     for name in names:
         spec = CASES[name]
+        out = spec["out"]
+        if out_dir:
+            out = str(Path(out_dir) / Path(spec["out"]).name)
+        extra = [
+            f"# source=nmc100ah_gen_long",
+            f"# case={name}",
+            f"# tag={spec['tag']}",
+        ]
         print(f"======== {name}  {spec['tag']} ========")
-        run_sim(
-            out=spec["out"],
-            sequence=spec["sequence"],
-            soc0=spec["soc0"],
-            noise_seed=spec["seed"],
-            noise_enable=False if args.no_noise else None,
-            rc2=args.rc2,
-            extra_meta=[f"# source=nmc100ah_ecm_gen_long", f"# case={name}", f"# tag={spec['tag']}"],
-        )
+        if args.pybamm:
+            from nmc100ah_pybamm import run_sim as run_pybamm
+
+            run_pybamm(
+                out=out,
+                sequence=spec["sequence"],
+                soc0=spec["soc0"],
+                noise_seed=spec["seed"],
+                noise_enable=False if args.no_noise else None,
+                thermal=args.thermal,
+                extra_meta=extra,
+            )
+        else:
+            run_sim(
+                out=out,
+                sequence=spec["sequence"],
+                soc0=spec["soc0"],
+                noise_seed=spec["seed"],
+                noise_enable=False if args.no_noise else None,
+                rc2=args.rc2,
+                extra_meta=extra,
+            )
 
 
 if __name__ == "__main__":

@@ -59,7 +59,7 @@ def _ensure_new_grid(args: argparse.Namespace) -> Path:
         raise FileNotFoundError(
             f"新年份目录为空：{new_dir}  先加 --make-new --r0-scale 1.15 --r1-scale 1.15"
         )
-    from nmc100ah_ecm_gen_grid import run_grid
+    from nmc100ah_gen_grid import run_grid
 
     print(
         f"生成新年份网格 -> {new_dir}  "
@@ -82,7 +82,7 @@ def _ensure_old_grid(args: argparse.Namespace) -> Path:
         return old_dir
     if not args.make_old:
         raise FileNotFoundError(f"旧网格为空：{old_dir}  先跑 gen_grid，或加 --make-old")
-    from nmc100ah_ecm_gen_grid import run_grid
+    from nmc100ah_gen_grid import run_grid
 
     print(f"生成 BOL 网格 -> {old_dir}")
     run_grid(n_soc=args.n_soc, n_temp=args.n_temp, output_dir=old_dir)
