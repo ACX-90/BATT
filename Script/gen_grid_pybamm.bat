@@ -28,7 +28,6 @@
 ::   --noise-soc X     SOC meas std, 1 = 100 pp (task D: 0.005)
 ::                     raise noise to a NEW directory; do not rewrite Data/grid
 ::   --dry-run         print grid only; no delete, no sim
-::   --edge-c-half     SOC>0.85 charge x0.5; SOC<0.15 discharge x0.5
 ::
 :: scan range: Src/Sim/nmc100ah_gen_grid.py header
 ::   SOC_MIN / SOC_MAX     default 0.10 to 0.90, inclusive; n=1 uses midpoint
@@ -53,5 +52,5 @@
 ::   see Src/Sim/readme.md
 :: =============================================================================
 
-python .\..\Src\Sim\nmc100ah_gen_grid.py --n-soc 10 --n-temp 10 --pybamm --edge-c-half --out-dir Data/grid_pybamm
+python .\..\Src\Sim\nmc100ah_gen_grid.py --n-soc 10 --n-temp 10 --pybamm --out-dir Data/grid_pybamm
 pause

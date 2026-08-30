@@ -147,11 +147,10 @@ python Src/Sim/nmc100ah_gen_grid.py --out-dir Data/grid_noisy --n-soc 10 --n-tem
 python Src/Sim/nmc100ah_pybamm.py
 python Src/Sim/nmc100ah_gen.py --pybamm --out Data/nmc100ah_pybamm_sim.csv
 python Src/Sim/nmc100ah_gen_grid.py --pybamm --out-dir Data/grid_pybamm
-python Src/Sim/nmc100ah_gen_grid.py --pybamm --edge-c-half --out-dir Data/grid_pybamm
 python Src/Sim/nmc100ah_gen_grid.py --pybamm --n-soc 5 --n-temp 5 --out-dir Data/grid_pybamm --dry-run
 ```
 
-`--pybamm` 沿用同一套 `SEQUENCE`、噪声、步长和 CSV 列。端电压 / OCV / SOC 来自 SPM；`r0_ohm,r1_ohm,c1_f` 在同一 `(I,T,SOC)` 上用仓库 ECM 求值，只作教师列。默认等温，温度轴与 ECM 网格同义；`--thermal` 打开 lumped 热。不能和 `--rc2` / `--soh` / `--r0-scale` 叠用。`--edge-c-half` 只改该份边沿电流（SOC>0.85 充电减半，SOC<0.15 放电减半），不改默认 SEQUENCE。
+`--pybamm` 沿用同一套 `SEQUENCE`、噪声、步长和 CSV 列。端电压 / OCV / SOC 来自 SPM；`r0_ohm,r1_ohm,c1_f` 在同一 `(I,T,SOC)` 上用仓库 ECM 求值，只作教师列。默认等温，温度轴与 ECM 网格同义；`--thermal` 打开 lumped 热。不能和 `--rc2` / `--soh` / `--r0-scale` 叠用。每格从 1x 电流起步：充电序列触发保护则本格充电电流 ×0.7 重跑，还触发就 ×0.7²、×0.7³… 直到通过；放电同理、独立缩放。下一格仍从 1x 开始。
 
 正式跑之前会先删掉输出目录里已有的 `*.csv`（含 `index.csv`），避免换档数后旧文件混进训练集。`--dry-run` 不删、不写。
 

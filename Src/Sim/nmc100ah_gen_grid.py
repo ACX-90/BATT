@@ -9,7 +9,6 @@
     python Src/Sim/nmc100ah_gen_grid.py --n-soc 5 --n-temp 5
     python Src/Sim/nmc100ah_gen_grid.py --dry-run
     python Src/Sim/nmc100ah_gen_grid.py --pybamm --out-dir Data/grid_pybamm
-    python Src/Sim/nmc100ah_gen_grid.py --pybamm --edge-c-half --out-dir Data/grid_pybamm
 """
 
 from __future__ import annotations
@@ -45,12 +44,11 @@ OUTPUT_DIR = "Data/grid"
 FILE_NAME = "nmc100ah_ecm_s{i:02d}_t{j:02d}_soc{soc_pct:03.0f}_T{t_c:+03.0f}.csv"
 FILE_NAME_PYBAMM = "nmc100ah_pybamm_s{i:02d}_t{j:02d}_soc{soc_pct:03.0f}_T{t_c:+03.0f}.csv"
 
-# --edge-c-half：只改该份工况的电流，不改 nmc100ah_gen.SEQUENCE。
-# 起始 SOC > EDGE_SOC_HIGH → 充电电流 × EDGE_CURRENT_SCALE
-# 起始 SOC < EDGE_SOC_LOW  → 放电电流 × EDGE_CURRENT_SCALE
-EDGE_SOC_HIGH = 0.85
-EDGE_SOC_LOW = 0.15
-EDGE_CURRENT_SCALE = 0.3
+# --pybamm：本格 1x 起步。充电序列触发保护 → 本格充电电流 ×0.7 重跑；
+# 还触发就 ×0.7²、×0.7³… 直到通过。放电同理、独立计数。下一格仍从 1x 开始。
+# PROTECT_RETRY_MAX 只防步初已超压时缩电流也过不了。
+PROTECT_RETRY_SCALE = 0.7
+PROTECT_RETRY_MAX = 12
 
 # =============================================================================
 # 以下为扫描实现
@@ -101,25 +99,19 @@ _DIS_MODES = {"discharge", "dch", "dis", "dis_ramp"}
 _CURRENT_KEYS = ("c_rate", "current_a", "c_rate_start", "c_rate_end")
 
 
-def edge_current_scales(soc0: float, *, enabled: bool) -> tuple[float, float]:
-    """返回 (充电乘子, 放电乘子)。关开关或未到边沿时为 1。"""
-    if not enabled:
-        return 1.0, 1.0
-    s = float(soc0)
-    chg = EDGE_CURRENT_SCALE if s > EDGE_SOC_HIGH else 1.0
-    dis = EDGE_CURRENT_SCALE if s < EDGE_SOC_LOW else 1.0
-    return chg, dis
+def _is_unity(scale: float) -> bool:
+    return abs(float(scale) - 1.0) < 1e-12
 
 
-def scale_sequence_edge_current(
+def scale_sequence_current(
     sequence: list[dict],
-    soc0: float,
-    *,
-    enabled: bool,
+    chg_s: float,
+    dis_s: float,
 ) -> list[dict]:
-    """按起始 SOC 复制并缩放充/放电流；rest 不动。"""
-    chg_s, dis_s = edge_current_scales(soc0, enabled=enabled)
-    if chg_s == 1.0 and dis_s == 1.0:
+    """复制工况，按充/放乘子缩放电流；rest 不动。乘子相对原始 SEQUENCE（累计 0.7^n）。"""
+    chg_s = float(chg_s)
+    dis_s = float(dis_s)
+    if _is_unity(chg_s) and _is_unity(dis_s):
         return list(sequence)
     out: list[dict] = []
     for cmd in sequence:
@@ -130,7 +122,7 @@ def scale_sequence_edge_current(
             scale = dis_s
         else:
             scale = 1.0
-        if scale == 1.0:
+        if _is_unity(scale):
             out.append(cmd)
             continue
         item = dict(cmd)
@@ -141,7 +133,90 @@ def scale_sequence_edge_current(
     return out
 
 
-def _edge_tag(chg_s: float, dis_s: float) -> str:
+def polarity_cutoff(data: dict, sequence: list[dict]) -> tuple[bool, bool]:
+    """本轮仿真里充电 / 放电序列是否触发了保护。"""
+    cutoff = np.asarray(data["cutoff"], dtype=float)
+    cmd_ids = np.rint(np.asarray(data["cmd_id"], dtype=float)).astype(int)
+    chg_hit = False
+    dis_hit = False
+    for idx, cmd in enumerate(sequence):
+        mode = str(cmd.get("mode", "")).strip().lower()
+        if mode in _CHG_MODES:
+            charge = True
+        elif mode in _DIS_MODES:
+            charge = False
+        else:
+            continue
+        if not np.any((cmd_ids == idx) & (cutoff > 0)):
+            continue
+        if charge:
+            chg_hit = True
+        else:
+            dis_hit = True
+    return chg_hit, dis_hit
+
+
+def simulate_pybamm_with_protect_retry(
+    simulate_fn,
+    sequence: list[dict],
+    *,
+    idx: int,
+    dt_s: float,
+    soc0: float,
+    t_ambient_c: float,
+    noise_enable: bool,
+    noise_seed: int,
+    noise_std: dict[str, float],
+    enable_cutoff: bool,
+    thermal: bool,
+    verbose: bool,
+) -> tuple[dict[str, np.ndarray], list[dict], float, float]:
+    """本格 1x 起步；充/放各自触发保护则 ×0.7、×0.7²、×0.7³… 直到通过。"""
+    chg_s, dis_s = 1.0, 1.0
+    n_chg = n_dis = 0
+    first = True
+    data: dict[str, np.ndarray] | None = None
+    seq_k = list(sequence)
+    while True:
+        seq_k = scale_sequence_current(sequence, chg_s, dis_s)
+        data = simulate_fn(
+            seq_k,
+            dt_s=dt_s,
+            soc0=soc0,
+            t_ambient_c=t_ambient_c,
+            noise_enable=noise_enable,
+            noise_seed=noise_seed,
+            noise_std=noise_std,
+            enable_cutoff=enable_cutoff,
+            thermal=thermal,
+            verbose=verbose and first,
+        )
+        first = False
+        hit_chg, hit_dis = polarity_cutoff(data, sequence)
+        retry_chg = hit_chg and n_chg < PROTECT_RETRY_MAX
+        retry_dis = hit_dis and n_dis < PROTECT_RETRY_MAX
+        if not (retry_chg or retry_dis):
+            if hit_chg or hit_dis:
+                stuck = []
+                if hit_chg:
+                    stuck.append(f"充电仍保护×{chg_s:g}")
+                if hit_dis:
+                    stuck.append(f"放电仍保护×{dis_s:g}")
+                print(f"  [{idx:02d}] 保护重跑达上限  {' '.join(stuck)}")
+            return data, seq_k, chg_s, dis_s
+        bits = []
+        if retry_chg:
+            n_chg += 1
+            chg_s *= PROTECT_RETRY_SCALE
+            bits.append(f"充电×{chg_s:g}")
+        if retry_dis:
+            n_dis += 1
+            dis_s *= PROTECT_RETRY_SCALE
+            bits.append(f"放电×{dis_s:g}")
+        print(f"  [{idx:02d}] 保护重跑  {' '.join(bits)}")
+
+
+def _scale_tag(chg_s: float, dis_s: float) -> str:
     bits = []
     if chg_s != 1.0:
         bits.append(f"chg×{chg_s:g}")
@@ -190,7 +265,6 @@ def run_grid(
     rc2: bool = False,
     pybamm: bool = False,
     thermal: bool = False,
-    edge_c_half: bool = False,
 ) -> list[dict]:
     seq = SEQUENCE if sequence is None else sequence
     std = dict(NOISE_STD if noise_std is None else noise_std)
@@ -246,10 +320,10 @@ def run_grid(
         print(f"SOH  q={soh:g}  q_Q={soh_capacity:g}  a0={soh_a0:g} a1={soh_a1:g} aC={soh_ac:g}")
     if rc2:
         print("2RC  叠加慢支路（CSV 多 r2/c2/up2；BMS 不读）")
-    if edge_c_half:
+    if pybamm:
         print(
-            f"边沿电流  SOC>{EDGE_SOC_HIGH:g} 充电×{EDGE_CURRENT_SCALE:g}  "
-            f"SOC<{EDGE_SOC_LOW:g} 放电×{EDGE_CURRENT_SCALE:g}"
+            f"保护重跑  充电/放电触发保护则本格对应电流×{PROTECT_RETRY_SCALE:g}、"
+            f"×{PROTECT_RETRY_SCALE:g}^2… 直到通过；下一格仍 1x"
         )
     if dry_run:
         print("dry-run，不写文件")
@@ -263,8 +337,8 @@ def run_grid(
             except ValueError:
                 rel = out_dir / fname
             seed = int(noise_seed) + i * 100 + j
-            chg_s, dis_s = edge_current_scales(float(soc0), enabled=edge_c_half)
-            seq_k = scale_sequence_edge_current(seq, float(soc0), enabled=edge_c_half)
+            chg_s, dis_s = 1.0, 1.0
+            seq_k = list(seq)
             rec = {
                 "idx": idx,
                 "i_soc": i,
@@ -279,17 +353,27 @@ def run_grid(
             if dry_run:
                 print(
                     f"  [{idx:02d}] SOC={soc0:.3f}  T={t_c:+6.1f} °C"
-                    f"{_edge_tag(chg_s, dis_s)}  -> {fname}"
+                    f"{_scale_tag(chg_s, dis_s)}  -> {fname}"
                 )
-                rec.update(n_steps=0, duration_s=0.0, soc_end=float(soc0), ut_end=float("nan"), cutoff_steps=0)
+                rec.update(
+                    n_steps=0,
+                    duration_s=0.0,
+                    soc_end=float(soc0),
+                    ut_end=float("nan"),
+                    cutoff_steps=0,
+                    charge_c_scale=float(chg_s),
+                    discharge_c_scale=float(dis_s),
+                )
                 rows.append(rec)
                 idx += 1
                 continue
 
             if pybamm:
                 assert simulate_pybamm is not None
-                data = simulate_pybamm(
-                    seq_k,
+                data, seq_k, chg_s, dis_s = simulate_pybamm_with_protect_retry(
+                    simulate_pybamm,
+                    seq,
+                    idx=idx,
                     dt_s=DT_S,
                     soc0=float(soc0),
                     t_ambient_c=float(t_c),
@@ -312,7 +396,9 @@ def run_grid(
                     f"# grid_j_temp={j}",
                     f"# grid_n_soc={n_soc}",
                     f"# grid_n_temp={n_temp}",
-                    f"# edge_c_half={int(edge_c_half)}",
+                    f"# protect_retry=1",
+                    f"# protect_retry_scale={PROTECT_RETRY_SCALE:g}",
+                    f"# protect_retry_max={PROTECT_RETRY_MAX}",
                     f"# charge_c_scale={chg_s:g}",
                     f"# discharge_c_scale={dis_s:g}",
                     "# schema_version=1.1.0",
@@ -347,9 +433,6 @@ def run_grid(
                     f"# soh={soh}",
                     f"# soh_capacity={soh_capacity}",
                     f"# rc2={int(rc2)}",
-                    f"# edge_c_half={int(edge_c_half)}",
-                    f"# charge_c_scale={chg_s:g}",
-                    f"# discharge_c_scale={dis_s:g}",
                 ]
                 csv_source = "nmc100ah_gen"
             csv_path = write_csv(
@@ -370,6 +453,8 @@ def run_grid(
                 soc_end=float(data["soc_true"][-1]),
                 ut_end=float(data["u_t_true_v"][-1]),
                 cutoff_steps=int(np.sum(data["cutoff"] > 0)),
+                charge_c_scale=float(chg_s),
+                discharge_c_scale=float(dis_s),
                 path=str(csv_path.relative_to(REPO_ROOT)).replace("\\", "/")
                 if csv_path.is_relative_to(REPO_ROOT)
                 else str(csv_path).replace("\\", "/"),
@@ -377,7 +462,7 @@ def run_grid(
             print(
                 f"  [{idx:02d}] SOC {soc0:.3f}->{rec['soc_end']:.3f}  "
                 f"T={t_c:+6.1f} °C  Ut={rec['ut_end']:.3f} V"
-                f"{_edge_tag(chg_s, dis_s)}  {fname}"
+                f"{_scale_tag(chg_s, dis_s)}  {fname}"
             )
             rows.append(rec)
             idx += 1
@@ -400,10 +485,9 @@ def run_grid(
             "ocv_aging": False,
             "noise_enable": bool(noise_enable),
             "noise_std": std,
-            "edge_c_half": bool(edge_c_half),
-            "edge_soc_high": EDGE_SOC_HIGH,
-            "edge_soc_low": EDGE_SOC_LOW,
-            "edge_current_scale": EDGE_CURRENT_SCALE,
+            "protect_retry": bool(pybamm),
+            "protect_retry_scale": PROTECT_RETRY_SCALE,
+            "protect_retry_max": PROTECT_RETRY_MAX,
         }
         if pybamm:
             meta.update(
@@ -435,6 +519,8 @@ def _write_index(path: Path, rows: list[dict]) -> None:
         "soc_end",
         "ut_end",
         "cutoff_steps",
+        "charge_c_scale",
+        "discharge_c_scale",
         "file",
         "path",
     ]
@@ -475,15 +561,6 @@ def main() -> None:
         "--thermal",
         action="store_true",
         help="仅 --pybamm：打开 lumped 热模型（默认等温，与网格温度轴一致）",
-    )
-    parser.add_argument(
-        "--edge-c-half",
-        action="store_true",
-        help=(
-            f"起始 SOC>{EDGE_SOC_HIGH:g} 时充电电流×{EDGE_CURRENT_SCALE:g}，"
-            f"起始 SOC<{EDGE_SOC_LOW:g} 时放电电流×{EDGE_CURRENT_SCALE:g}；"
-            "不改默认 SEQUENCE"
-        ),
     )
     args = parser.parse_args()
 
@@ -532,7 +609,6 @@ def main() -> None:
         rc2=args.rc2,
         pybamm=args.pybamm,
         thermal=args.thermal,
-        edge_c_half=args.edge_c_half,
     )
 
 
