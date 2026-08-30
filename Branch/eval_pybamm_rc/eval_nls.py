@@ -31,12 +31,11 @@ DATA = REPO / "Data" / "grid_pybamm"
 OUT = HERE / "out_nls"
 DT = 0.1
 
-CASES = [
-    "nmc100ah_pybamm_s04_t05_soc054_T+23.csv",
-    "nmc100ah_pybamm_s04_t00_soc054_T-10.csv",
-    "nmc100ah_pybamm_s04_t09_soc054_T+50.csv",
-    "nmc100ah_pybamm_s09_t05_soc010_T+23.csv",
-]
+def load_all() -> list[Path]:
+    files = sorted(DATA.glob("nmc100ah_pybamm_s*_t*.csv"))
+    if not files:
+        raise FileNotFoundError(f"没有波形文件：{DATA}")
+    return files
 
 
 def load(path: Path) -> dict:
@@ -486,10 +485,11 @@ def run_one(path: Path) -> dict:
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    files = load_all()
+    print(f"共 {len(files)} 条波形，开始 NLS …", flush=True)
     reports = []
-    for name in CASES:
-        path = DATA / name
-        print("NLS", name, flush=True)
+    for path in files:
+        print("NLS", path.name, flush=True)
         rec = run_one(path)
         reports.append(rec)
         print(
