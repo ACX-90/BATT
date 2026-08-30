@@ -2,7 +2,7 @@
 Powered by SpaceXAI Grok 4.6
 
 > 对象：一阶 Thevenin（OCV + \(R_0\) + \(R_1\parallel C_1\)），放电电流为正，\(\Delta t=0.1\,\mathrm{s}\)  
-> 对照：`Doc/02-a-MLP-ECM物理信息参数估计.md`、`Doc/02-b-MLP-ECM固定C1方案与对比.md`、`Doc/03-a-MLP-ECM增量学习方案与问题.md`、`Doc/04-a` 任务 F / H  
+> 对照：`Doc/02-a-MLP-ECM物理信息参数估计.md`、`Doc/02-b-MLP-ECM固定C1方案与对比.md`、`Doc/03-a-MLP-ECM增量学习方案与问题.md`、`Doc/01-a` 滞后、`Doc/01-b` 默认不含滞后态、`Doc/04-a` 任务 F / H  
 > 对齐：`Src/Sim/nmc100ah_gen.py` 的离散化、`Src/AI/MLP` 方案 B（\(C_1\equiv C_1^\star\)）  
 > 目的：说清卡尔曼怎样用电压把 SOC 从安时积分里纠回来；MLP / ECM / KF 各管什么；电压误差里哪一段能拿去增量训 MLP  
 > 本文只做分析，不改代码
@@ -78,7 +78,7 @@ U_{p,k|k-1}
 \tag{4}
 \]
 
-\(R_{0,k},R_{1,k}\) 由 MLP 用**预测 SOC** 算出，见 §2.2，避免代数环。方案 B：\(C_{1,k}\equiv C_1^\star\)。别处「自带 ECM」的 EKF 在 1RC 上状态可以写成同一对 \((s,U_p)\)；和本仓库分立的差不在这两维，见 §2.5。
+\(R_{0,k},R_{1,k}\) 由 MLP 用**预测 SOC** 算出，见 §2.2，避免代数环。方案 B：\(C_{1,k}\equiv C_1^\star\)。别处「自带 ECM」的 EKF 在 1RC 上状态可以写成同一对 \((s,U_p)\)；和本仓库分立的差不在这两维，见 §2.5。还有一种三状态写法 \(\mathbf{x}=(s,V_1,V_{\mathrm{hyst}})\)：\(V_1\) 就是这里的 \(U_p\)，多的是 OCV 滞后电压。NCM 模板不默认上，评估见 §2.6。
 
 测量：
 
@@ -134,6 +134,8 @@ AEKF / 双估计：把 \(R_0\) 或 \((R_0,R_1)\) 扩进状态当随机游走。�
 | 静置回弹 | 中 | \(U_p\)、\(\tau_1\) | 先修正 \(U_p\)，\(s\) 慢跟 |
 
 可观性不足时，卡尔曼应几乎退回安时，而不是猛纠 SOC。实现上可用 \(\lvert\partial U_{\mathrm{ocv}}/\partial s\rvert\) 调度 \(R_v\) 或增益上限。
+
+充完和放完的久置电压差是滞后，不是 \(\partial U_{\mathrm{ocv}}/\partial s\) 变了。二维 EKF 会把它折进 \(s\)；写成 \((s,V_1,V_{\mathrm{hyst}})\) 则把折进 \(V_{\mathrm{hyst}}\) 当成功能。坑见 §2.6。
 
 ---
 
@@ -226,6 +228,64 @@ OCV 表仍是外生的，与 02-a、03-a 相同。KF 不学 OCV。
 
 **2RC 只是多一只慢状态，不改上面的分工。** 一体写法很自然扩成 \(\mathbf{x}=(s,U_{p1},U_{p2})\)，\(\mathbf{H}=[\partial U_{\mathrm{ocv}}/\partial s,\,-1,\,-1]\)。\(U_{p1}\) 与 \(U_{p2}\) 在观测上共线，只靠 \(\alpha_1\neq\alpha_2\) 分开（模板 \(\tau_2/\tau_1\approx 5\)，见 `Doc/01-a` §7）。本仓库 BMS 仍 1RC；2RC 只在生成器。任务 H（`Doc/04-a` §7.7）：1RC 滤波看 2RC 真值，开环留下 7–15 mV 慢尾巴，先验仍亚毫伏，休息 SOC 被拉约 0.3 pp——未建模的 \(U_{p2}\) 被啃进 \(s,U_p\)。若以后真升阶：仍然分立（MLP 最多再出 \(R_2\)，\(C_2\) 钉死），不要五参数 AEKF；门控静置要够到 \(\sim 3\tau_2\)。升阶是换 BMS，见 `Plan.md`、`Doc/02-b` §10。
 
+### 2.6 EKF \([s,\,V_1,\,V_{\mathrm{hyst}}]\)：多的不是第二只 RC
+
+别处常见另一种三状态：\(\mathbf{x}=(s,\,V_1,\,V_{\mathrm{hyst}})\)。记号换了，\(V_1\) 就是本仓库的 \(U_p\)——快极化，过程仍是 (4) 的 \(\alpha\) 衰减。和上面的 \((s,U_{p1},U_{p2})\) **不是同一件事**：第三维不是更慢的 RC，是 OCV 充放分叉的记忆。
+
+\(V_{\mathrm{hyst}}\) 的过程不是指数回弹。一状态滞后（Plett 一类）大致是：充电 \(I<0\) 时往 \(+M\) 走，放电往 \(-M\) 走，
+
+\[
+V_{\mathrm{hyst},k}
+=\beta_k V_{\mathrm{hyst},k-1}+(1-\beta_k)\,M(s_k)\,\mathrm{sgn}(-I_k),
+\qquad
+\beta_k=\exp\bigl(-\gamma\lvert I_k\rvert\Delta t\bigr)
+\tag{4h}
+\]
+
+\(I=0\) 时 \(\beta=1\)，滞后**冻住**，不往 0 掉。\(M\) 是主环半幅，\(\gamma\) 把时间尺度钉在安时上而不是秒上：几秒脉冲几乎不动 \(V_{\mathrm{hyst}}\)，0.3C 走一小时才会饱和。这是它和 \(V_1\)（\(\tau_1\approx 18\,\mathrm{s}\)）、\(U_{p2}\)（模板 \(\tau_2=90\,\mathrm{s}\)）能分开的唯一理由——休息够久之后 \(V_1\to 0\)，\(V_{\mathrm{hyst}}\) 还在。
+
+平均 OCV 加滞后电压（放电 \(I>0\)，与 (5) 同一套符号）：
+
+\[
+\hat U_{t,k|k-1}
+=U_{\mathrm{ocv,avg}}(s_{k|k-1},T_k)-I_k R_{0,k}-V_{1,k|k-1}+V_{\mathrm{hyst},k|k-1}
+\tag{5h}
+\]
+
+\[
+\mathbf{H}_k
+=\bigl[
+\partial U_{\mathrm{ocv}}/\partial s,\;
+-1,\;
++1
+\bigr]
+\tag{7h}
+\]
+
+**观测上仍和 \(s\) 共线。** 休息、\(V_1\) 掉完：
+
+\[
+e^{\mathrm{pri}}\approx (\partial U_{\mathrm{ocv}}/\partial s)\,\delta s+\delta V_{\mathrm{hyst}}
+\]
+
+中段约 3 mV / 1% SOC 时，10 mV 滞后整段啃进 \(s\) 就是大约 3 pp，和英飞凌 10 mV 死区折成的 SOC 常偏同一量级（§1.2）。卡尔曼按 \(\mathbf{Q}\) 分赃：\(q_{\mathrm{hyst}}\) 大则休息 SOC 好看、滞后状态扛着表误差；\(q_s\) 大则充完和放完的休息点差一截 SOC。再叠 \(\delta R_0\)，一条标量创新要喂四张嘴（\(s,V_1,V_{\mathrm{hyst}},\delta R_0\)），§5.1 更狠。
+
+**NCM 模板默认不必上。** `Doc/01-a`：NCM 滞后小到中，LFP 才大；正确做法是 OCV 分充放（或带滞后态）+\(R_1\) 分充放，而不是先扩滤波器。`Doc/01-b` 默认不含滞后态（除充放分叉外）。本仓库生成器、MLP、EKF 都没有 \(V_{\mathrm{hyst}}\)。数 mV 到十几 mV 的主环（NCM 常见数量级）在本仓库中段 OCV 上是大约 2–7 pp 的休息 SOC 分叉；多数标定用充放两张 OCV 表就能吃掉，不必给每拍滤波多一只不可观状态。
+
+| | \((s,U_p)\) 本仓库 | \((s,V_1,V_{\mathrm{hyst}})\) | \((s,U_{p1},U_{p2})\) |
+|--|---------------------|-------------------------------|------------------------|
+| 第三维 | 无（\(\delta R_0\) 可选、默认关） | 路径依赖的 OCV 偏移 | 慢极化，电流驱动 |
+| \(I=0\) | \(U_p\to 0\) | \(V_{\mathrm{hyst}}\) 冻住 | \(U_{p2}\) 按 \(\tau_2\) 掉 |
+| 时间尺度 | \(\tau_1\sim 18\,\mathrm{s}\) | 安时（\(\gamma\lvert I\rvert\)） | \(\tau_2\sim 90\,\mathrm{s}\) |
+| 休息残差给谁 | \(s\)（和 OCV 表） | \(s\) 与 \(V_{\mathrm{hyst}}\) 抢 | \(s\) 与 \(U_{p2}\) 抢，终会掉 |
+| 本仓库 | 默认 | 不上 | 只在生成器 |
+
+**和增量的接口。** 开环 ECM 若没有 \(V_{\mathrm{hyst}}\)，充放分叉留在 \(e^{\mathrm{ol}}\)。01-a §4.5 已经警告：OCV 只用平均曲线，辨识会把滞后吞进 \(R_1\)，充放参数对不上。门控里「静置很久仍有常偏」应先查 OCV 表和 \(s_0\)，不要当 \(R_0\)，也不要当成「该扩滞后状态」的充分条件。反过来：EKF 带了 \(V_{\mathrm{hyst}}\)、开环增量不带，闭环休息 SOC 会好看，\(e^{\mathrm{ol}}\) 仍有分叉，增量可能把分叉写成 \(R_1\)——滤波和曲面各解释一套。要上就生成器 / ECM / 开环损失一起上；只改 EKF 维数是自欺。
+
+**和任务 H 同类，不要用增量去跟。** 未建模的滞后在 1RC 滤波里，就是休息常偏被啃进 \(s\)（或被 \(\delta R_0\) 在有电流时乱跟）。生成器以后若加滞后开关，对照应像 04-a H：BMS 仍 \((s,U_p)\)，报开环常偏和休息 SOC 被拉多少，**不要**用 \(e^{\mathrm{ol}}\) 的静置段去增量 \(R\)。升阶滞后是换 OCV 模型，不是换 MLP。
+
+一期明确不做：把 \(V_{\mathrm{hyst}}\) 扩进本仓库 EKF；用滞后状态去吸收 OCV 表误差或容量错的斜坡。
+
 ---
 
 ## 3. 电压误差有三种，增量只能吃其中一种
@@ -277,7 +337,8 @@ NIS 长期 \(\gg 1\)：\(R\) 图错、OCV 错，或 \(R_v\) 太小。NIS 健康�
 |------|----------|----------|
 | 边沿尖、稳态还行 | \(R_0\) | 改 SOC 初值 |
 | 回弹快慢不对 | \(R_1\) / \(\tau_1\)（方案 B 即 \(R_1\)） | 上方案 A 放 \(C_1\) |
-| 静置很久仍有常偏 | OCV 表或 \(s_0\) | 把偏差写进 \(R_0\) |
+| 静置很久仍有常偏 | OCV 表或 \(s_0\) | 把偏差写进 \(R_0\)；扩 \(V_{\mathrm{hyst}}\) 进 EKF |
+| 充完休息和放完休息同一 SOC 对不上 | OCV 滞后 / 表没用对（§2.6） | 把分叉写进 \(R_1\)；只给 KF 加滞后维、开环仍用平均 OCV |
 | 长时间匀速漂 | 电流偏置 / 容量 \(q\) | 增量 MLP |
 | 只在某温度大 | MLP 曲面该温区，或温度传感器 | 当全域老化 |
 | 平台区 NIS 乱、两端还好 | SOC 不可观 + \(R_v\) 没调度 | 在平台区猛更新 \(s\) 或猛训 MLP |
@@ -366,7 +427,7 @@ KF **不能**补上缺失的 SOH 输入。它只能把「表错了」的电压�
 
 ### 5.1 误差归属：SOC 和 \(R\) 抢同一创新
 
-\(e^{\mathrm{pri}}\approx (\partial U_{\mathrm{ocv}}/\partial s)\,\delta s - I\,\delta R_0 - \delta U_p\)。三项观测上共线的时候，卡尔曼按 \(\mathbf{Q}\) 分赃。\(q_s\) 过大：电阻老化被改成 SOC 漂移，满电点越来越歪，MLP 看不到 \(e^{\mathrm{ol}}\) 里的 \(R\) 偏差（若你错误地用了 \(s^+\) 去组开环）。\(q_s\) 过小：电流真偏置无法纠正。
+\(e^{\mathrm{pri}}\approx (\partial U_{\mathrm{ocv}}/\partial s)\,\delta s - I\,\delta R_0 - \delta U_p\)。三项观测上共线的时候，卡尔曼按 \(\mathbf{Q}\) 分赃。\(q_s\) 过大：电阻老化被改成 SOC 漂移，满电点越来越歪，MLP 看不到 \(e^{\mathrm{ol}}\) 里的 \(R\) 偏差（若你错误地用了 \(s^+\) 去组开环）。\(q_s\) 过小：电流真偏置无法纠正。若再扩 \(V_{\mathrm{hyst}}\)，休息段变成 \(e^{\mathrm{pri}}\approx(\partial U_{\mathrm{ocv}}/\partial s)\delta s+\delta V_{\mathrm{hyst}}\)，第四张嘴只在有电流时才和 \(U_p\) 分开，见 §2.6。
 
 标定：在已知 SOC 的休息点（久置后 OCV）看 \(s^+\) 是否钉住；在脉冲边沿看 \(e^{\mathrm{ol}}\) 是否随 \(I\) 变。前者管 \(q_s\)，后者管要不要增量 \(R_0\)。
 
@@ -441,7 +502,7 @@ python Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv --capacity-scale 1.05
 4. 需要再加很慢的 \(\delta R_0\)。仍不要逐步反传 MLP，不要联合估 \(C_1\)。  
 5. 寿命跨度大再立项 SOH 输入。KF 解决不了缺维。
 
-一期明确不做：KF 状态里塞 MLP 权重、每拍 `backward`、增量方案 A、用后验残差当 \(L_v\)、平台区无激励时更新 \(R\)。
+一期明确不做：KF 状态里塞 MLP 权重、每拍 `backward`、增量方案 A、用后验残差当 \(L_v\)、平台区无激励时更新 \(R\)、把 \(V_{\mathrm{hyst}}\) 扩进 EKF。
 
 ---
 
@@ -455,5 +516,6 @@ python Src/AI/KF/run.py --best --csv Data/long/cc_rest.csv --capacity-scale 1.05
 | MLP 故意偏大 \(R_0\) | \(e^{\mathrm{ol}}\) 边沿变大；\(s\) 不应被长期拉走 |
 | 增量之后 | 旧网格开环 RMSE 不明显变差；新日志 \(e^{\mathrm{ol}}\) 下降；休息点 \(s\) 不恶化 |
 | NIS | 增量后回到 \(O(1)\)，不是靠把 \(R_v\) 调爆 |
+| 充/放休息点对同一 SOC | 分叉若只在数 mV，\((s,U_p)\) 钉住即可；不要为这点扩 \(V_{\mathrm{hyst}}\) |
 
-电压贴上了但休息 SOC 歪了，优先查 §5.1 和 §5.3，而不是再降 MLP 学习率。
+电压贴上了但休息 SOC 歪了，优先查 §5.1 和 §5.3，而不是再降 MLP 学习率。充完和放完对不上，先查 OCV 表，见 §2.6。
