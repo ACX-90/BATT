@@ -113,7 +113,7 @@ class SocUpEKF:
         u_p_pred, u_t_pri, alpha = ecm1_step(
             i_a, self.u_p, r0_used, r1, c1, u_ocv, cfg.dt_s
         )
-        # 创新 e = U_meas − U_t⁻（先验电压残差）
+        # 新息 e = U_meas − U_t⁻（先验电压残差）
         e_pri = float(u_meas) - u_t_pri
         # 先验状态误差协方差 P⁻ = F P Fᵀ + Q（对状态估计有多不确定）
         F = np.eye(self.n)  # 状态转移矩阵 F
@@ -137,7 +137,7 @@ class SocUpEKF:
             H = np.array([[slope, -1.0, -i_a]], dtype=float)
         else:
             H = np.array([[slope, -1.0]], dtype=float)
-        # 创新协方差 S = H P⁻ Hᵀ + Rv：预期电压残差有多大波动
+        # 新息协方差 S = H P⁻ Hᵀ + Rv：预期电压残差有多大波动
         # 两部分：状态不确定度投影到电压上，再加上测量噪声 Rv（不是「单纯的测量不确定度」）
         s_innov = float(np.asarray(H @ P_pri @ H.T).reshape(-1)[0] + rv)
         s_innov = max(s_innov, 1.0e-18)
@@ -146,7 +146,7 @@ class SocUpEKF:
         # 卡尔曼增益 K = P⁻ Hᵀ / S；|K| 大更信测量，|K| 小更信预测
         K = (P_pri @ H.T) / s_innov
         if cfg.ks_max > 0.0:
-            # 只限幅 SOC 增益 K_s，避免平台区 / 大创新时一步把 s 拉飞；K_up、K_δR0 不裁
+            # 只限幅 SOC 增益 K_s，避免平台区 / 大新息时一步把 s 拉飞；K_up、K_δR0 不裁
             K[0, 0] = float(np.clip(K[0, 0], -cfg.ks_max, cfg.ks_max))
         # x⁺ = x⁻ + K e：SOC、Up、δR0 同一套线性修正
         dx = (K * e_pri).reshape(-1)

@@ -1,6 +1,6 @@
 # Src/AI/KF — EKF 估 SOC + MLP–ECM 端电压 + 离线增量
 
-状态只含 \((s,U_p)\)。MLP 仍只出 \((R_0,R_1)\)（方案 B 下 \(C_1\) 钉死），ECM 算 \(\hat U_t\)。卡尔曼每拍用电压创新改正 SOC 和极化，**不改 MLP 权重**。
+状态只含 \((s,U_p)\)。MLP 仍只出 \((R_0,R_1)\)（方案 B 下 \(C_1\) 钉死），ECM 算 \(\hat U_t\)。卡尔曼每拍用电压新息改正 SOC 和极化，**不改 MLP 权重**。
 
 设计见 `Doc/03-c-卡尔曼SOC与MLP-ECM融合增量学习.md`、`Doc/03-a-MLP-ECM增量学习方案与问题.md`。
 
@@ -15,7 +15,7 @@
 2. MLP(I, s⁻, T)     → R0, R1    （C1 = C1★）
 3. 极化预测          Up⁻
 4. 先验电压          Ût⁻ = OCV(s⁻,T) − I R0 − Up⁻
-5. 创新              e_pri = Ut_meas − Ût⁻
+5. 新息              e_pri = Ut_meas − Ût⁻
 6. EKF 更新          s⁺, Up⁺
 ```
 
@@ -26,7 +26,7 @@
 | 残差 | 含义 | 能否训 MLP |
 |------|------|------------|
 | \(e^{ol}\) | 纯安时 SOC + 同一套 ECM，不经过 KF | **增量主损失** |
-| \(e^{pri}\) | 滤波创新 | 看 NIS，不用来反传 |
+| \(e^{pri}\) | 滤波新息 | 看 NIS，不用来反传 |
 | \(e^{post}\) | 更新后残差 | **不要**当损失 |
 
 ## 文件
@@ -165,7 +165,7 @@ python Src/AI/EV_Local/plot.py
 python Src/AI/EV_Local/plot.py --exp a --csv Data/soh_k115/nmc100ah_ecm_s02_t02_soc050_T+20.csv --show
 ```
 
-默认写出 `Fig/local/phase1_*.png`（开环残差 + EKF SOC / 创新 / NIS）。`window.py` / `kgrid.py` 跑完也会出图，`--no-plot` 关掉；只想开环加 `--no-kf`。
+默认写出 `Fig/local/phase1_*.png`（开环残差 + EKF SOC / 新息 / NIS）。`window.py` / `kgrid.py` 跑完也会出图，`--no-plot` 关掉；只想开环加 `--no-kf`。
 
 车上权重写到 `Data/ai_local/`，实验室离线增量仍写 `Data/ai_kf/incr/`，**都不覆盖** `Data/ai_mlp/best.pt`。滤波改用新表：
 

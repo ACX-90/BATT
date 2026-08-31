@@ -306,7 +306,7 @@ def plot_soc(
         st = STYLE[key]
         plot_overlay(axes[3], t, log["e_pri"] * 1e3, st["kind"], color=st["color"], label=st["label"])
         v_bits.append(f"{st['label']} {float(np.sqrt(np.mean(log['e_pri']**2))*1e3):.2f} mV")
-    axes[3].set_ylabel("先验创新 / mV")
+    axes[3].set_ylabel("先验新息 / mV")
     axes[3].legend(loc="upper right", ncol=len(logs))
     axes[3].set_title("电压 $e^{pri}$ RMSE  " + "   ".join(v_bits) + "   （增量仍只用开环）", loc="left", fontsize=9)
 

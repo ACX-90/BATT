@@ -34,7 +34,7 @@ class KfConfig:
     slope_min: float = 0.20
     rv_max_scale: float = 25.0
 
-    # SOC 增益上限（每伏特创新）。0 表示不限制
+    # SOC 增益上限（每伏特新息）。0 表示不限制
     ks_max: float = 2.0
 
     # 慢变局部电阻残差，默认关（文档一期不做）
