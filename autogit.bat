@@ -26,6 +26,7 @@
 ::   commit message is hard-coded "auto update"
 :: =============================================================================
 
+git fetch
 git pull
 git add *
 git commit -m "auto update"
