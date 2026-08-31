@@ -156,7 +156,7 @@ NCM 相对 LFP 的整体差别：
 
 ### 3.3 随温度（最强因素之一）
 
-\(R_{0}\) 服从近似 Arrhenius 关系：
+\(R_{0}\) 服从近似 Arrhenius 关系（\({R}\) 是理想气体常数）：
 
 \[
 R_{0}(T) = R_{0,\mathrm{ref}} \cdot \exp\left[\frac{E_{a,0}}{R}\left(\frac{1}{T}-\frac{1}{T_{\mathrm{ref}}}\right)\right]
