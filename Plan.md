@@ -263,6 +263,7 @@ C = C^{\mathrm{BOL}}\cdot\bigl(1+a_C(1-q)\bigr),\ a_C<0
 | `Doc/06-a` | 第 2 期包级对照方案：180 串、\(b_I\) 门、2A–2G（含 2A3 通道系数、2A4 制造公差 \(Q_i\)） |
 | `Doc/06-b` | 查表支线与 AI 支线；规格书对 2RC 的口径 |
 | `Doc/06-c` | 2β：1RC 查表 + \(\delta U\)；离开参考点用策略信封 |
+| `Doc/06-d` | 第 2 期包级数字：2A1 已跑 |
 | `Doc/A0-a` | 包级、TC4D7 |
 | `Doc/A0-b` | ST / NXP AI MCU 与 TC4D7 对照 |
 | `Src/AI/KF/increment.py` | 实验室 Replay / 缩放 / 微调（车上不走这里） |

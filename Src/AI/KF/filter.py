@@ -55,9 +55,11 @@ def _open_loop(
     *,
     dt_s: float,
     u_p0: float,
+    ocv=None,
 ) -> dict[str, np.ndarray]:
     r0, r1, c1 = provider.params_seq(i_a, s_ah, t_c)
-    u_ocv = np.asarray(ocv_nmc(s_ah, t_c), dtype=float)
+    ocv_fn = ocv_nmc if ocv is None else ocv
+    u_ocv = np.asarray(ocv_fn(s_ah, t_c), dtype=float)
     i_t = torch.from_numpy(i_a.astype(np.float32)).unsqueeze(0)
     ocv_t = torch.from_numpy(u_ocv.astype(np.float32)).unsqueeze(0)
     r0_t = torch.from_numpy(r0.astype(np.float32)).unsqueeze(0)
@@ -90,6 +92,8 @@ def run_filter(
     current_bias: float = 0.0,
     time_s: np.ndarray | None = None,
     soc_true: np.ndarray | None = None,
+    ocv=None,
+    docv=None,
 ) -> dict[str, np.ndarray]:
     """只吃测量电流 / 温度 / 电压。current_bias 加在所用电流上（演示传感器零偏）。"""
     cfg = cfg if cfg is not None else KfConfig()
@@ -103,7 +107,7 @@ def run_filter(
 
     init = pick_soc0(i_used, t_c, u_meas, soc0=s0)
     s_init = float(np.clip(init.s0 + soc_error, cfg.soc_min, cfg.soc_max))
-    ekf = SocUpEKF(cfg)
+    ekf = SocUpEKF(cfg, ocv=ocv, docv=docv)
     ekf.reset(s_init, u_p0 if u_p0 != 0.0 else init.u_p0)
 
     s_ah = np.empty(n)
@@ -151,7 +155,9 @@ def run_filter(
         k_s[k] = step.k_s
         k_up[k] = step.k_up
 
-    ol = _open_loop(provider, i_used, s_ah, t_c, u_meas, dt_s=cfg.dt_s, u_p0=init.u_p0)
+    ol = _open_loop(
+        provider, i_used, s_ah, t_c, u_meas, dt_s=cfg.dt_s, u_p0=init.u_p0, ocv=ocv
+    )
     out: dict[str, np.ndarray] = {
         "time_s": np.asarray(time_s, dtype=float),
         "i_meas_a": i_a,

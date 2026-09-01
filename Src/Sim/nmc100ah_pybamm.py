@@ -301,6 +301,21 @@ def _infeasible_at_ic(exc: BaseException) -> bool:
     return "infeasible" in msg and "initial" in msg
 
 
+def apply_k_r(params, k_r: float, *, r_dc_ohm: float = 1.45e-3) -> None:
+    """2A1 的 k 乘到 SPM：串联接触电阻 (k-1)*(R0+R1)_ref。
+
+    不改 Ds / 交换电流——那些是 SPM 真物理；k 只模拟同一点涨阻。
+    1C 上 (k-1)*1.45 mΩ ≈ 22 mV，和 ECM ×1.15 的墙同量级。
+    """
+    k_r = float(k_r)
+    if abs(k_r - 1.0) < 1e-12:
+        return
+    if k_r <= 0:
+        raise ValueError(f"k_r 必须为正，得到 {k_r}")
+    extra = (k_r - 1.0) * float(r_dc_ohm)
+    params["Contact resistance [Ohm]"] = float(params["Contact resistance [Ohm]"]) + extra
+
+
 def simulate(
     sequence: list[dict] | None = None,
     *,
@@ -313,6 +328,7 @@ def simulate(
     enable_cutoff: bool = ENABLE_CUTOFF,
     thermal: bool = False,
     verbose: bool = False,
+    k_r: float = 1.0,
 ) -> dict[str, np.ndarray]:
     """按 SEQUENCE 跑 SPM，返回与 nmc100ah_gen.simulate 相同的列。"""
     pybamm = _import_pybamm()
@@ -327,6 +343,7 @@ def simulate(
     groups = _group_plan(plan)
 
     param = build_100ah_params(verbose=verbose)
+    apply_k_r(param, k_r)
     t0_k = float(t_ambient_c) + 273.15
     param["Initial temperature [K]"] = t0_k
     param["Ambient temperature [K]"] = t0_k

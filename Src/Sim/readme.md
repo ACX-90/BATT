@@ -15,6 +15,7 @@
 | `nmc100ah_gen_grid.py` | 网格批量出波；默认 ECM，`--pybamm --out-dir Data/grid_pybamm` |
 | `nmc100ah_gen_long.py` | 小时级负例；同样默认 ECM，`--pybamm` 写 `Data/long_pybamm/` |
 | `nmc100ah_pybamm.py` | PyBaMM SPM 后端（Chen2020→100Ah），由上面三个入口的 `--pybamm` 调用 |
+| `nmc100ah_gen_pack.py` | 包级：一条真电流 → \(N_s\) 只电压；`--engine pybamm` 顶真包。口径 `Doc/06-a` |
 
 请在**仓库根目录**运行脚本，相对路径 `Data/`、`Doc/` 才正确。
 

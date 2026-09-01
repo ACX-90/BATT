@@ -62,8 +62,10 @@ def ecm1_step(
 
 class SocUpEKF:
     # KfConfig | None：3.10+ 联合类型，None 则内部 new 默认配置。
-    def __init__(self, cfg: KfConfig | None = None) -> None:
+    def __init__(self, cfg: KfConfig | None = None, *, ocv=None, docv=None) -> None:
         self.cfg = cfg if cfg is not None else KfConfig()
+        self.ocv = ocv_nmc if ocv is None else ocv
+        self.docv = docv_ds if docv is None else docv
         self.n = 3 if self.cfg.estimate_dr0 else 2
         self.s = 0.5
         self.u_p = 0.0
@@ -106,9 +108,9 @@ class SocUpEKF:
         # 使用已估算的慢变 δR0，吸收「这一趟比表偏 50 µΩ」，不改曲面，Doc/04-a §7.4
         r0_used = float(r0) + (self.d_r0 if cfg.estimate_dr0 else 0.0)
         # SOC查表获取OCV
-        u_ocv = float(ocv_nmc(s_pred, t_celsius))
+        u_ocv = float(self.ocv(s_pred, t_celsius))
         # dOCV/dSOC斜率，用于计算雅可比
-        slope = float(docv_ds(s_pred, t_celsius))
+        slope = float(self.docv(s_pred, t_celsius))
         # ECM状态推进
         u_p_pred, u_t_pri, alpha = ecm1_step(
             i_a, self.u_p, r0_used, r1, c1, u_ocv, cfg.dt_s
@@ -167,7 +169,7 @@ class SocUpEKF:
         # 后验 δR0 是否叠进 R0，由 estimate_dr0 决定（这里不是「再估一次」）
         r0_post = float(r0) + (d_r0_post if cfg.estimate_dr0 else 0.0)
         # 用后验 OCV(s⁺)、R0⁺、Up⁺ 算诊断端电压；不回代 MLP
-        u_t_post = float(ocv_nmc(s_post, t_celsius)) - i_a * r0_post - u_p_post
+        u_t_post = float(self.ocv(s_post, t_celsius)) - i_a * r0_post - u_p_post
 
         ##### 诊断日志 #####
         # e_post、NIS = e²/S：滤波器健康度，只记账，不参与滤波、不当 MLP 损失
