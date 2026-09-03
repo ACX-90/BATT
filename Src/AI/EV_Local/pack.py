@@ -1,9 +1,11 @@
 """包级滑窗 k 网格 + 包级门（Doc/06-a §7）。
 
-    python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1_n8 --mode freeze
-    python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1_n8 --mode kgrid --out-dir Data/pack/2a1_n8_kgrid
+    python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1 --mode freeze
+    python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1 --mode kgrid --out-dir Data/pack/2a1_kgrid
+    python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1 --mode demo --out-dir Data/pack/2a1_demo
 
 不覆盖 Data/grid / Data/ai_mlp / Data/ai_local。更新路径不读旧网格。
+demo 是 10 mV / 0.1 s 失败对照，不要用 10 s 窗假装。
 """
 from __future__ import annotations
 
@@ -21,11 +23,12 @@ AI_DIR = KF_DIR.parent
 if str(AI_DIR) not in sys.path:
     sys.path.insert(0, str(AI_DIR))
 
-from KF.adapter import KGridAdapter, MlpParamProvider  # noqa: E402
+from KF.adapter import KGRID_SOC, KGRID_T, KGridAdapter, MlpParamProvider, ResidualHeadAdapter  # noqa: E402
 from KF.config import REPO_ROOT  # noqa: E402
 from KF.filter import filter_metrics, run_filter  # noqa: E402
 from KF.ocv import docv_ds, ocv_nmc  # noqa: E402
 from KF.pack_gate import last_edge_age_s, pack_gate, window_policy  # noqa: E402
+from MLP.ecm import ecm_forward  # noqa: E402
 from MLP.infer import load_bundle  # noqa: E402
 from MLP.train import set_seed  # noqa: E402
 from window import window_gate  # noqa: E402
@@ -63,8 +66,12 @@ def load_pack(pack_dir: Path) -> tuple[dict, dict[str, np.ndarray]]:
     meta = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
     blob = np.load(pack_dir / "pack.npz")
     data = {k: blob[k] for k in blob.files}
-    if float(meta.get("b_I", 0.0)) != 0.0 and meta.get("exp") == "2a1":
-        raise RuntimeError("2A1 必须 b_I=0")
+    exp = str(meta.get("exp", ""))
+    b_i = float(meta.get("b_I", 0.0))
+    if b_i != 0.0 and exp.startswith("2a"):
+        raise RuntimeError(f"{exp} 必须 b_I=0")
+    if exp == "2b" and abs(b_i - 5.0) > 1e-6:
+        raise RuntimeError("2b 必须 b_I=5")
     return meta, data
 
 
@@ -243,6 +250,165 @@ def run_cell_kgrid(
     }
 
 
+def _xn(scaler, i_a: float, soc: float, t_c: float, device) -> torch.Tensor:
+    feat = np.array([[i_a, soc, t_c]], dtype=float)
+    return torch.from_numpy(scaler.transform(feat).astype(np.float32)).to(device)
+
+
+def _head_k_at(model: ResidualHeadAdapter, scaler, i_a: float, soc: float, t_c: float, device):
+    x = _xn(scaler, i_a, soc, t_c, device)
+    with torch.no_grad():
+        r0, r1, _ = model(x)
+        r0f, r1f, _ = model.fleet(x)
+        d = model.delta(x).reshape(2)
+    return (
+        float(r0 / r0f.clamp_min(1e-12)),
+        float(r1 / r1f.clamp_min(1e-12)),
+        float(d[0]),
+        float(d[1]),
+    )
+
+
+def _head_k_tables(model: ResidualHeadAdapter, scaler, device) -> dict:
+    k0, k1, dr0, dr1 = [], [], [], []
+    for s in KGRID_SOC:
+        row_k0, row_k1, row_d0, row_d1 = [], [], [], []
+        for t_c in KGRID_T:
+            kk0, kk1, d0, d1 = _head_k_at(model, scaler, 100.0, float(s), float(t_c), device)
+            row_k0.append(kk0)
+            row_k1.append(kk1)
+            row_d0.append(d0)
+            row_d1.append(d1)
+        k0.append(row_k0)
+        k1.append(row_k1)
+        dr0.append(row_d0)
+        dr1.append(row_d1)
+    return {
+        "soc_node": list(KGRID_SOC),
+        "t_node": list(KGRID_T),
+        "k0": k0,
+        "k1": k1,
+        "dr0": dr0,
+        "dr1": dr1,
+    }
+
+
+def run_cell_demo(
+    model: ResidualHeadAdapter,
+    seq: dict,
+    scaler,
+    cfg,
+    device,
+    *,
+    e_thr: float,
+    lr: float,
+    grad_clip: float,
+) -> dict:
+    """|e_ol|>10 mV 就当前拍 SGD，无窗门 / 包门 / 停放门（06-a demo 原样）。
+
+    舰队 / φ 按拍预计算；循环里只动 18 个数。
+    """
+    dt_s = float(cfg.dt_s)
+    t = _seq_tensors(seq, scaler, device)
+    n = int(t["i"].shape[0])
+    with torch.no_grad():
+        r0f, r1f, c1f = model.fleet(t["x"])
+        h = model.phi(t["x"])
+    r0f = r0f.detach()
+    r1f = r1f.detach()
+    c1f = c1f.detach()
+    h = h.detach()
+    i_all = t["i"]
+    ocv_all = t["u_ocv"]
+    ut_all = t["u_t"]
+    u_p = t["i"].new_zeros(())
+    opt = torch.optim.SGD(model.trainable_parameters(), lr=lr)
+    n_upd = 0
+    dt = t["i"].new_tensor(dt_s)
+    dr_max = model.dr_max
+    for k in range(n):
+        i_k = i_all[k]
+        c1 = c1f[k]
+        with torch.no_grad():
+            z = model.head(h[k])
+            d = dr_max * torch.tanh(z)
+            r0 = r0f[k] + d[0]
+            r1 = r1f[k] + d[1]
+            tau = (r1 * c1).clamp_min(1.0e-6)
+            alpha = torch.exp(-dt / tau)
+            u_p_new = alpha * u_p + r1 * (1.0 - alpha) * i_k
+            e = (ocv_all[k] - i_k * r0 - u_p_new) - ut_all[k]
+            e_abs = float(e.abs())
+        if e_abs > e_thr:
+            opt.zero_grad(set_to_none=True)
+            z = model.head(h[k])
+            d = dr_max * torch.tanh(z)
+            r0 = r0f[k] + d[0]
+            r1 = r1f[k] + d[1]
+            tau = (r1 * c1).clamp_min(1.0e-6)
+            alpha = torch.exp(-dt / tau)
+            u_p_new = alpha * u_p + r1 * (1.0 - alpha) * i_k
+            e = (ocv_all[k] - i_k * r0 - u_p_new) - ut_all[k]
+            (0.5 * e.pow(2)).backward()
+            if grad_clip > 0:
+                torch.nn.utils.clip_grad_norm_(model.trainable_parameters(), grad_clip)
+            opt.step()
+            n_upd += 1
+            with torch.no_grad():
+                z = model.head(h[k])
+                d = dr_max * torch.tanh(z)
+                r1 = r1f[k] + d[1]
+                tau = (r1 * c1).clamp_min(1.0e-6)
+                alpha = torch.exp(-dt / tau)
+                u_p = (alpha * u_p.detach() + r1 * (1.0 - alpha) * i_k).detach()
+        else:
+            u_p = u_p_new.detach()
+
+    soc_m = float(seq["soc"].mean())
+    t_m = float(seq["t"].mean())
+    k_ref = _head_k_at(model, scaler, 100.0, 0.50, 25.0, device)
+    k_mean = _head_k_at(model, scaler, 100.0, soc_m, t_m, device)
+    return {
+        "n_win": n,
+        "n_update": n_upd,
+        "n_skip_gate": n - n_upd,
+        "n_skip_pack": 0,
+        "n_skip_park": 0,
+        "k_at_ref": [k_ref[0], k_ref[1]],
+        "k_at_mean": [k_mean[0], k_mean[1]],
+        "dr_at_mean": [k_mean[2], k_mean[3]],
+        "k_tables": _head_k_tables(model, scaler, device),
+        "demo_e_thr_mV": e_thr * 1e3,
+        "demo_lr": lr,
+    }
+
+
+@torch.no_grad()
+def _rmse_head(model: ResidualHeadAdapter, seq: dict, scaler, cfg, device) -> float:
+    t = _seq_tensors(seq, scaler, device)
+    r0, r1, c1 = model(t["x"].unsqueeze(0))
+    u_hat, _ = ecm_forward(
+        t["i"].unsqueeze(0),
+        t["u_ocv"].unsqueeze(0),
+        r0,
+        r1,
+        c1,
+        dt_s=cfg.dt_s,
+        u_p0=t["i"].new_tensor([float(seq.get("u_p0", 0.0))]),
+    )
+    err = u_hat.squeeze(0) - t["u_t"]
+    return float(err.pow(2).mean().sqrt().cpu())
+
+
+def _load_phi(phi_dir: Path, fleet, scaler, cfg, device):
+    from head import load_or_make_phi
+
+    args = SimpleNamespace(make_phi=not (phi_dir / "best.pt").exists(), phi_epochs=40)
+    if args.make_phi:
+        print(f"缺少 {phi_dir}，实验室蒸馏 3×8 前层（读 Data/grid，不写回舰队）", flush=True)
+    return load_or_make_phi(fleet, scaler, cfg, phi_dir, device, args)
+
+
 def summarize_cells(cells: list[dict], rows: list[dict]) -> dict:
     aged = [r for r, c in zip(rows, cells) if c["aged"]]
     nom = [r for r, c in zip(rows, cells) if not c["aged"]]
@@ -252,16 +418,45 @@ def summarize_cells(cells: list[dict], rows: list[dict]) -> dict:
             return float("nan")
         return float(np.mean([g["k_at_mean"][idx] for g in group]))
 
-    return {
+    def _mean(group, key):
+        if not group or key not in group[0]:
+            return float("nan")
+        return float(np.mean([g[key] for g in group]))
+
+    out = {
         "n_aged": len(aged),
         "n_nom": len(nom),
         "k0_aged": _mean_k(aged, 0),
         "k1_aged": _mean_k(aged, 1),
         "k0_nom": _mean_k(nom, 0),
         "k1_nom": _mean_k(nom, 1),
-        "rmse_ol_aged_mV": float(np.mean([g["e_ol_rmse_mV"] for g in aged])) if aged else float("nan"),
-        "rmse_ol_nom_mV": float(np.mean([g["e_ol_rmse_mV"] for g in nom])) if nom else float("nan"),
+        "rmse_ol_aged_mV": _mean(aged, "e_ol_rmse_mV"),
+        "rmse_ol_nom_mV": _mean(nom, "e_ol_rmse_mV"),
+        "rmse_frozen_aged_mV": _mean(aged, "rmse_frozen_true_mV"),
+        "rmse_frozen_nom_mV": _mean(nom, "rmse_frozen_true_mV"),
+        "rmse_after_aged_mV": _mean(aged, "rmse_after_true_mV"),
+        "rmse_after_nom_mV": _mean(nom, "rmse_after_true_mV"),
+        "n_update_aged": _mean(aged, "n_update"),
+        "n_update_nom": _mean(nom, "n_update"),
     }
+    if not aged and nom:
+        k0 = np.array([g["k_at_mean"][0] for g in nom], dtype=float)
+        k1 = np.array([g["k_at_mean"][1] for g in nom], dtype=float)
+        out.update(
+            {
+                "k0_p05": float(np.percentile(k0, 5)),
+                "k0_p50": float(np.percentile(k0, 50)),
+                "k0_p95": float(np.percentile(k0, 95)),
+                "k1_p50": float(np.percentile(k1, 50)),
+                "dk0_median": float(np.median(k0 - 1.0)),
+                "dk1_median": float(np.median(k1 - 1.0)),
+                "frac_k0_gt_1": float(np.mean(k0 > 1.0)),
+                "n_k0_in_1pm03": int(np.sum(np.abs(k0 - 1.0) <= 0.03)),
+                "n_k0_up": int(np.sum(k0 > 1.03)),
+                "n_k0_dn": int(np.sum(k0 < 0.97)),
+            }
+        )
+    return out
 
 
 def main() -> None:
@@ -269,7 +464,11 @@ def main() -> None:
     p.add_argument("--pack-dir", required=True)
     p.add_argument("--out-dir", default=None)
     p.add_argument("--mlp-dir", default="Data/ai_mlp")
-    p.add_argument("--mode", default="kgrid", choices=["freeze", "kgrid", "kgrid-nogate"])
+    p.add_argument("--mode", default="kgrid", choices=["freeze", "kgrid", "kgrid-nogate", "demo"])
+    p.add_argument("--phi-dir", default="Data/ai_mlp_h8")
+    p.add_argument("--demo-lr", type=float, default=0.02, help="demo 0.1 s SGD；不是 kgrid 的 lr=10")
+    p.add_argument("--demo-e-thr", type=float, default=0.010, help="|e_ol| 死区 / V")
+    p.add_argument("--dr-max", type=float, default=2.0e-3)
     p.add_argument("--win", type=int, default=100)
     p.add_argument("--lr", type=float, default=10.0)
     p.add_argument("--smooth", type=float, default=1.0e-3)
@@ -341,7 +540,11 @@ def main() -> None:
     rows = []
     nogate = args.mode == "kgrid-nogate"
     do_k = args.mode in {"kgrid", "kgrid-nogate"}
+    do_demo = args.mode == "demo"
     frozen_model = KGridAdapter(base).to(device)
+    phi = None
+    if do_demo:
+        phi = _load_phi(_resolve(args.phi_dir), base, scaler, cfg, device)
     for i, cell in enumerate(cells):
         seq_true = cell_seq(
             data, i, soc=data["soc_true"][:, i], name=f"c{i:03d}_true", ocv=ocv_fn
@@ -386,9 +589,42 @@ def main() -> None:
                 f"rmse {rmse0*1e3:.2f}→{rmse1*1e3:.2f} mV",
                 flush=True,
             )
+        if do_demo:
+            model = ResidualHeadAdapter(base, phi, dr_max=args.dr_max).to(device)
+            dg = run_cell_demo(
+                model,
+                seq_ah,
+                scaler,
+                cfg,
+                device,
+                e_thr=args.demo_e_thr,
+                lr=args.demo_lr,
+                grad_clip=args.grad_clip,
+            )
+            row.update(dg)
+            rmse1 = _rmse_head(model, seq_true, scaler, cfg, device)
+            row["rmse_after_true_mV"] = rmse1 * 1e3
+            print(
+                f"  demo {i:03d} aged={int(cell['aged'])}  "
+                f"k_mean=({dg['k_at_mean'][0]:.3f},{dg['k_at_mean'][1]:.3f})  "
+                f"upd={dg['n_update']}/{dg['n_win']}  "
+                f"rmse {rmse0*1e3:.2f}→{rmse1*1e3:.2f} mV",
+                flush=True,
+            )
         rows.append(row)
 
-    summary = summarize_cells(cells, rows) if do_k else {}
+    summary = summarize_cells(cells, rows) if (do_k or do_demo) else {}
+    if not summary:
+        aged = [r for r, c in zip(rows, cells) if c["aged"]]
+        nom = [r for r, c in zip(rows, cells) if not c["aged"]]
+        summary = {
+            "n_aged": len(aged),
+            "n_nom": len(nom),
+            "rmse_ol_aged_mV": float(np.mean([g["e_ol_rmse_mV"] for g in aged])) if aged else float("nan"),
+            "rmse_ol_nom_mV": float(np.mean([g["e_ol_rmse_mV"] for g in nom])) if nom else float("nan"),
+            "rmse_frozen_aged_mV": float(np.mean([g["rmse_frozen_true_mV"] for g in aged])) if aged else float("nan"),
+            "rmse_frozen_nom_mV": float(np.mean([g["rmse_frozen_true_mV"] for g in nom])) if nom else float("nan"),
+        }
     out_dir.mkdir(parents=True, exist_ok=True)
     report = {
         "mode": args.mode,
@@ -409,20 +645,44 @@ def main() -> None:
         "summary": summary,
         "win": args.win,
         "lr": args.lr,
+        "phi_dir": _rel(_resolve(args.phi_dir)) if do_demo else None,
+        "demo_lr": args.demo_lr if do_demo else None,
+        "demo_e_thr_mV": args.demo_e_thr * 1e3 if do_demo else None,
     }
     (out_dir / "pack_run.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    if do_k:
+    if do_k or do_demo:
         torch.save(
             {f"cell_{r['id']}": {"k_at_ref": r["k_at_ref"], "k_tables": r.get("k_tables")} for r in rows},
             out_dir / "last.pt",
         )
-        print(
-            f"summary  k0 aged/nom={summary['k0_aged']:.3f}/{summary['k0_nom']:.3f}  "
-            f"k1 {summary['k1_aged']:.3f}/{summary['k1_nom']:.3f}",
-            flush=True,
-        )
+        if summary.get("n_aged", 0) == 0 and "k0_p50" in summary:
+            print(
+                f"summary  k0 p50={summary['k0_p50']:.3f}  Δk_med={summary['dk0_median']:+.3f}  "
+                f"in_1±0.03={summary['n_k0_in_1pm03']}/{summary['n_nom']}  "
+                f"up/dn={summary['n_k0_up']}/{summary['n_k0_dn']}",
+                flush=True,
+            )
+        else:
+            print(
+                f"summary  k0 aged/nom={summary['k0_aged']:.3f}/{summary['k0_nom']:.3f}  "
+                f"k1 {summary['k1_aged']:.3f}/{summary['k1_nom']:.3f}",
+                flush=True,
+            )
+    else:
+        if summary.get("n_aged", 0) == 0:
+            print(
+                f"summary  freeze RMSE mean="
+                f"{summary['rmse_frozen_nom_mV']:.2f} mV",
+                flush=True,
+            )
+        else:
+            print(
+                f"summary  freeze RMSE aged/nom="
+                f"{summary['rmse_frozen_aged_mV']:.2f}/{summary['rmse_frozen_nom_mV']:.2f} mV",
+                flush=True,
+            )
     print(f"写出 {out_dir / 'pack_run.json'}", flush=True)
 
     # 2A1 烟测断言（数字作废，只拦脚本写错）
@@ -436,6 +696,27 @@ def main() -> None:
                 f"WARN 涨阻芯 k0={summary['k0_aged']:.3f} 相对未涨 "
                 f"{summary['k0_nom']:.3f} 没朝 1.15 走（看的是点到的节点，不是 0.5/25 参考点）"
             )
+    if meta["exp"] in {"2a3", "2a4"} and do_k:
+        if gate["blocked"]:
+            print(f"WARN {meta['exp']} 包级门不应触发")
+        if summary.get("n_k0_up", 0) == n or summary.get("n_k0_dn", 0) == n:
+            print(f"WARN {meta['exp']} 全包同号，抽签或门可能写错")
+    if meta["exp"] == "2b":
+        if do_k and not nogate:
+            if not gate["blocked"]:
+                print("WARN 2B 包级门应触发")
+            if summary.get("n_k0_in_1pm03", n) < n:
+                print(
+                    f"WARN 2B 主档 k 应保持 1（in_1±0.03="
+                    f"{summary.get('n_k0_in_1pm03')}/{n}）"
+                )
+        if do_demo:
+            n_side = max(summary.get("n_k0_up", 0), summary.get("n_k0_dn", 0))
+            if n_side < max(1, int(0.8 * n)):
+                print(
+                    f"WARN 2B demo 应全包同号大改 k（up/dn="
+                    f"{summary.get('n_k0_up')}/{summary.get('n_k0_dn')}）"
+                )
 
 
 if __name__ == "__main__":

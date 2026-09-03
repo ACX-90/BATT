@@ -241,6 +241,7 @@ def simulate(
     enable_cutoff: bool = ENABLE_CUTOFF,
     rc2: bool | None = None,
     u_p2_0: float = 0.0,
+    soc_capacity_ah: float | None = None,
 ) -> dict[str, np.ndarray]:
     cell = model.params.cell
     lim = model.params.validity
@@ -254,7 +255,8 @@ def simulate(
         sequence, dt_s=dt_s, capacity_ah=cell.capacity_ah, t_default=t_ambient_c
     )
     n = len(plan)
-    q_as = cell.capacity_ah * 3600.0
+    # 电流按铭牌 C 率（包共享 I）；真 SOC 可用每芯 Q_i（2A4）。
+    q_as = float(cell.capacity_ah if soc_capacity_ah is None else soc_capacity_ah) * 3600.0
 
     extra = []
     if use_rc2:
