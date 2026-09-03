@@ -1,4 +1,4 @@
-/* 英飞凌 demo 残差头 3→8→2。复制：mcu_eval_common.* + 本文件。 */
+/* 英飞凌 ifx_demo 残差头 3→8→2。复制：mcu_eval_common.* + 本文件。 */
 #include "mcu_eval_algos.h"
 #include <math.h>
 

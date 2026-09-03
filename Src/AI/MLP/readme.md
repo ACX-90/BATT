@@ -14,7 +14,7 @@ MLP 输入电流、SOC、温度，输出 \(R_0,R_1\)（方案 A 再加 \(C_1\)�
 - `Doc/04-b-增量学习应用手册.md`（按任务选档；车上菜单见 §2.3）
 - `Doc/05-d-车上增量精度评估.md`（第 1 期精度：默认写 \(k\) 网格，头丢掉）
 - `Doc/05-e-第1期实验汇报.md`（第 1 期结题汇报）
-- `Doc/A0-a-TC4D7-PPU与800V系统融合评估.md`（TC4D7 + 800 V 包 + demo / 优化）
+- `Doc/A0-a-TC4D7-PPU与800V系统融合评估.md`（TC4D7 + 800 V 包 + ifx_demo / 优化）
 - `Doc/A0-b-ST与NXP的AI-MCU对照.md`（ST / NXP 与英飞凌对照）
 
 闭环滤波和离线增量在 [`Src/AI/KF/`](../KF/readme.md)，车上滑窗在 [`Src/AI/EV_Local/`](../KF/readme.md)。不要在本目录的 `test.py` 里更新权重。

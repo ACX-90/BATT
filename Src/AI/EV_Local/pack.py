@@ -2,10 +2,10 @@
 
     python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1 --mode freeze
     python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1 --mode kgrid --out-dir Data/pack/2a1_kgrid
-    python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1 --mode demo --out-dir Data/pack/2a1_demo
+    python Src/AI/EV_Local/pack.py --pack-dir Data/pack/2a1 --mode ifx_demo --out-dir Data/pack/2a1_ifx_demo
 
 不覆盖 Data/grid / Data/ai_mlp / Data/ai_local。更新路径不读旧网格。
-demo 是 10 mV / 0.1 s 失败对照，不要用 10 s 窗假装。
+ifx_demo 是 10 mV / 0.1 s 失败对照，不要用 10 s 窗假装。
 """
 from __future__ import annotations
 
@@ -304,7 +304,7 @@ def run_cell_demo(
     lr: float,
     grad_clip: float,
 ) -> dict:
-    """|e_ol|>10 mV 就当前拍 SGD，无窗门 / 包门 / 停放门（06-a demo 原样）。
+    """|e_ol|>10 mV 就当前拍 SGD，无窗门 / 包门 / 停放门（06-a ifx_demo 原样）。
 
     舰队 / φ 按拍预计算；循环里只动 18 个数。
     """
@@ -464,9 +464,9 @@ def main() -> None:
     p.add_argument("--pack-dir", required=True)
     p.add_argument("--out-dir", default=None)
     p.add_argument("--mlp-dir", default="Data/ai_mlp")
-    p.add_argument("--mode", default="kgrid", choices=["freeze", "kgrid", "kgrid-nogate", "demo"])
+    p.add_argument("--mode", default="kgrid", choices=["freeze", "kgrid", "kgrid-nogate", "ifx_demo"])
     p.add_argument("--phi-dir", default="Data/ai_mlp_h8")
-    p.add_argument("--demo-lr", type=float, default=0.02, help="demo 0.1 s SGD；不是 kgrid 的 lr=10")
+    p.add_argument("--demo-lr", type=float, default=0.02, help="ifx_demo 0.1 s SGD；不是 kgrid 的 lr=10")
     p.add_argument("--demo-e-thr", type=float, default=0.010, help="|e_ol| 死区 / V")
     p.add_argument("--dr-max", type=float, default=2.0e-3)
     p.add_argument("--win", type=int, default=100)
@@ -540,10 +540,10 @@ def main() -> None:
     rows = []
     nogate = args.mode == "kgrid-nogate"
     do_k = args.mode in {"kgrid", "kgrid-nogate"}
-    do_demo = args.mode == "demo"
+    do_ifx_demo = args.mode == "ifx_demo"
     frozen_model = KGridAdapter(base).to(device)
     phi = None
-    if do_demo:
+    if do_ifx_demo:
         phi = _load_phi(_resolve(args.phi_dir), base, scaler, cfg, device)
     for i, cell in enumerate(cells):
         seq_true = cell_seq(
@@ -589,7 +589,7 @@ def main() -> None:
                 f"rmse {rmse0*1e3:.2f}→{rmse1*1e3:.2f} mV",
                 flush=True,
             )
-        if do_demo:
+        if do_ifx_demo:
             model = ResidualHeadAdapter(base, phi, dr_max=args.dr_max).to(device)
             dg = run_cell_demo(
                 model,
@@ -605,7 +605,7 @@ def main() -> None:
             rmse1 = _rmse_head(model, seq_true, scaler, cfg, device)
             row["rmse_after_true_mV"] = rmse1 * 1e3
             print(
-                f"  demo {i:03d} aged={int(cell['aged'])}  "
+                f"  ifx_demo {i:03d} aged={int(cell['aged'])}  "
                 f"k_mean=({dg['k_at_mean'][0]:.3f},{dg['k_at_mean'][1]:.3f})  "
                 f"upd={dg['n_update']}/{dg['n_win']}  "
                 f"rmse {rmse0*1e3:.2f}→{rmse1*1e3:.2f} mV",
@@ -613,7 +613,7 @@ def main() -> None:
             )
         rows.append(row)
 
-    summary = summarize_cells(cells, rows) if (do_k or do_demo) else {}
+    summary = summarize_cells(cells, rows) if (do_k or do_ifx_demo) else {}
     if not summary:
         aged = [r for r, c in zip(rows, cells) if c["aged"]]
         nom = [r for r, c in zip(rows, cells) if not c["aged"]]
@@ -645,14 +645,14 @@ def main() -> None:
         "summary": summary,
         "win": args.win,
         "lr": args.lr,
-        "phi_dir": _rel(_resolve(args.phi_dir)) if do_demo else None,
-        "demo_lr": args.demo_lr if do_demo else None,
-        "demo_e_thr_mV": args.demo_e_thr * 1e3 if do_demo else None,
+        "phi_dir": _rel(_resolve(args.phi_dir)) if do_ifx_demo else None,
+        "demo_lr": args.demo_lr if do_ifx_demo else None,
+        "demo_e_thr_mV": args.demo_e_thr * 1e3 if do_ifx_demo else None,
     }
     (out_dir / "pack_run.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    if do_k or do_demo:
+    if do_k or do_ifx_demo:
         torch.save(
             {f"cell_{r['id']}": {"k_at_ref": r["k_at_ref"], "k_tables": r.get("k_tables")} for r in rows},
             out_dir / "last.pt",
@@ -710,11 +710,11 @@ def main() -> None:
                     f"WARN 2B 主档 k 应保持 1（in_1±0.03="
                     f"{summary.get('n_k0_in_1pm03')}/{n}）"
                 )
-        if do_demo:
+        if do_ifx_demo:
             n_side = max(summary.get("n_k0_up", 0), summary.get("n_k0_dn", 0))
             if n_side < max(1, int(0.8 * n)):
                 print(
-                    f"WARN 2B demo 应全包同号大改 k（up/dn="
+                    f"WARN 2B ifx_demo 应全包同号大改 k（up/dn="
                     f"{summary.get('n_k0_up')}/{summary.get('n_k0_dn')}）"
                 )
 
