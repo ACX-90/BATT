@@ -24,7 +24,7 @@ if str(AI_DIR) not in sys.path:
     sys.path.insert(0, str(AI_DIR))
 
 from KF.adapter import KGRID_SOC, KGRID_T, KGridAdapter, MlpParamProvider, ResidualHeadAdapter  # noqa: E402
-from KF.config import REPO_ROOT  # noqa: E402
+from KF.config import KfConfig, REPO_ROOT  # noqa: E402
 from KF.filter import filter_metrics, run_filter  # noqa: E402
 from KF.ocv import docv_ds, ocv_nmc  # noqa: E402
 from KF.pack_gate import last_edge_age_s, pack_gate, window_policy  # noqa: E402
@@ -72,6 +72,10 @@ def load_pack(pack_dir: Path) -> tuple[dict, dict[str, np.ndarray]]:
         raise RuntimeError(f"{exp} 必须 b_I=0")
     if exp == "2b" and abs(b_i - 5.0) > 1e-6:
         raise RuntimeError("2b 必须 b_I=5")
+    if exp == "2e" and abs(b_i) > 1e-6:
+        raise RuntimeError("2e 必须 b_I=0")
+    if exp.startswith("2d") and abs(b_i) > 1e-6:
+        raise RuntimeError(f"{exp} 必须 b_I=0")
     return meta, data
 
 
@@ -134,18 +138,30 @@ def run_cell_filter(
     *,
     ocv=None,
     docv=None,
+    cfg: KfConfig | None = None,
 ) -> dict:
     log = run_filter(
         provider,
         np.asarray(data["i_meas"], dtype=float),
         np.asarray(data["t_meas"][:, i], dtype=float),
         np.asarray(data["u_t_meas"][:, i], dtype=float),
+        cfg=cfg,
         s0=float(soc0),
         soc_true=np.asarray(data["soc_true"][:, i], dtype=float),
         ocv=ocv,
         docv=docv,
     )
     return log
+
+
+def _trip_index(start: int, trips: list[int]) -> int:
+    idx = 0
+    for i, t0 in enumerate(trips):
+        if start >= int(t0):
+            idx = i
+        else:
+            break
+    return idx
 
 
 def _kgrid_args(args) -> SimpleNamespace:
@@ -172,6 +188,8 @@ def run_cell_kgrid(
     *,
     pack_blocked: bool,
     nogate: bool,
+    trips: list[int] | None = None,
+    k_after_trips: int = 1,
 ) -> dict:
     win = int(args.win)
     dt_s = cfg.dt_s
@@ -182,9 +200,11 @@ def run_cell_kgrid(
     ns, nt = model.log_k0.shape
     hit0 = np.zeros((ns, nt), dtype=float)
     hit1 = np.zeros((ns, nt), dtype=float)
-    n_win = n_upd = n_skip_gate = n_skip_pack = n_skip_park = 0
+    n_win = n_upd = n_skip_gate = n_skip_pack = n_skip_park = n_skip_trip = 0
     kg_args = _kgrid_args(args)
     i_np_all = seq["i"]
+    trip_starts = [int(x) for x in (trips or [0])]
+    hold_until = max(int(k_after_trips) - 1, 0)
     for start in range(0, n, win):
         end = min(start + win, n)
         if end - start < max(win // 4, 20):
@@ -207,6 +227,10 @@ def run_cell_kgrid(
         pol = window_policy(has_edge=bool(gstat["has_edge"]), last_edge_age_s=age)
         if pack_blocked and not nogate:
             n_skip_pack += 1
+            u_p0 = _roll_up(model, sl, u_p0, dt_s, len(i_np) // 2)
+            continue
+        if _trip_index(start, trip_starts) < hold_until:
+            n_skip_trip += 1
             u_p0 = _roll_up(model, sl, u_p0, dt_s, len(i_np) // 2)
             continue
         if not pol["write_k"]:
@@ -242,6 +266,7 @@ def run_cell_kgrid(
         "n_skip_gate": n_skip_gate,
         "n_skip_pack": n_skip_pack,
         "n_skip_park": n_skip_park,
+        "n_skip_trip": n_skip_trip,
         "k_at_ref": list(k_ref),
         "k_at_mean": list(k_mean),
         "k_tables": model.k_tables(),
@@ -439,9 +464,10 @@ def summarize_cells(cells: list[dict], rows: list[dict]) -> dict:
         "n_update_aged": _mean(aged, "n_update"),
         "n_update_nom": _mean(nom, "n_update"),
     }
-    if not aged and nom:
-        k0 = np.array([g["k_at_mean"][0] for g in nom], dtype=float)
-        k1 = np.array([g["k_at_mean"][1] for g in nom], dtype=float)
+    if (not aged and nom) or (aged and not nom):
+        group = nom if nom else aged
+        k0 = np.array([g["k_at_mean"][0] for g in group], dtype=float)
+        k1 = np.array([g["k_at_mean"][1] for g in group], dtype=float)
         out.update(
             {
                 "k0_p05": float(np.percentile(k0, 5)),
@@ -456,6 +482,13 @@ def summarize_cells(cells: list[dict], rows: list[dict]) -> dict:
                 "n_k0_dn": int(np.sum(k0 < 0.97)),
             }
         )
+        if group and "d_r0_end_uOhm" in group[0]:
+            dr = np.array([g["d_r0_end_uOhm"] for g in group], dtype=float)
+            out["d_r0_p50_uOhm"] = float(np.percentile(dr, 50))
+            out["d_r0_mean_uOhm"] = float(np.mean(dr))
+        if group and "s_end_post_err_pp" in group[0]:
+            se = np.array([g["s_end_post_err_pp"] for g in group], dtype=float)
+            out["s_post_err_p50_pp"] = float(np.median(se))
     return out
 
 
@@ -481,6 +514,14 @@ def main() -> None:
     p.add_argument("--grad-clip", type=float, default=1.0)
     p.add_argument("--device", default="cpu")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--dr0", action="store_true", help="EKF 慢变 δR0（2D）")
+    p.add_argument("--r0-scale", type=float, default=1.0, help="放大 MLP 读出的 R0，2D 用 1.06")
+    p.add_argument(
+        "--k-after-trips",
+        type=int,
+        default=1,
+        help="第 N 趟才写 k（2D 主档 3；1 是把这一趟升级成老化的失败对照）",
+    )
     args = p.parse_args()
     set_seed(args.seed)
 
@@ -493,7 +534,8 @@ def main() -> None:
     n = int(meta["n"])
     print(
         f"pack {meta['exp']} n={n} engine={meta.get('engine')} b_I={meta.get('b_I')}  "
-        f"mode={args.mode} mlp={mlp_dir}",
+        f"mode={args.mode} mlp={mlp_dir}  r0_scale={args.r0_scale:g} dr0={int(args.dr0)}  "
+        f"k_after_trips={args.k_after_trips}",
         flush=True,
     )
 
@@ -503,7 +545,8 @@ def main() -> None:
     for par in base.parameters():
         par.requires_grad_(False)
     base = base.to(device).eval()
-    provider = MlpParamProvider(base, scaler, device=device)
+    provider = MlpParamProvider(base, scaler, device=device, r0_scale=args.r0_scale)
+    kf_cfg = KfConfig(estimate_dr0=bool(args.dr0))
 
     ocv_fn, docv_fn = ocv_nmc, docv_ds
     if str(meta.get("engine", "ecm")).lower() == "pybamm":
@@ -516,16 +559,18 @@ def main() -> None:
     ds_traj = []
     for i, cell in enumerate(cells):
         log = run_cell_filter(
-            provider, data, i, cell["soc0"], ocv=ocv_fn, docv=docv_fn
+            provider, data, i, cell["soc0"], ocv=ocv_fn, docv=docv_fn, cfg=kf_cfg
         )
         logs.append(log)
         ds = log["soc_post"] - log["soc_ah"]
         ds_traj.append(ds)
         ds_last[i] = float(ds[-1])
         m = filter_metrics(log)
+        s_err = m.get("s_end_post_err", float("nan"))
         print(
             f"  filt {i:03d} aged={int(cell['aged'])}  e_ol={m['e_ol_rmse_mV']:.2f} mV  "
-            f"Δs={ds_last[i]*1e2:+.3f} pp  s_ah={m['s_end_ah']:.4f}",
+            f"Δs={ds_last[i]*1e2:+.3f} pp  s_post_err={s_err*1e2:+.3f} pp  "
+            f"δR0={m['d_r0_end_uOhm']:+.1f} µΩ",
             flush=True,
         )
     ds_mat = np.stack(ds_traj, axis=1)
@@ -541,7 +586,8 @@ def main() -> None:
     nogate = args.mode == "kgrid-nogate"
     do_k = args.mode in {"kgrid", "kgrid-nogate"}
     do_ifx_demo = args.mode == "ifx_demo"
-    frozen_model = KGridAdapter(base).to(device)
+    frozen_model = KGridAdapter(base, r0_scale=args.r0_scale).to(device)
+    trips = [int(x) for x in meta.get("trips", [0])]
     phi = None
     if do_ifx_demo:
         phi = _load_phi(_resolve(args.phi_dir), base, scaler, cfg, device)
@@ -563,12 +609,16 @@ def main() -> None:
             "e_ol_rmse_mV": fm["e_ol_rmse_mV"],
             "e_pri_rmse_mV": fm["e_pri_rmse_mV"],
             "ds_end": float(ds_last[i]),
+            "d_r0_end_uOhm": fm["d_r0_end_uOhm"],
+            "d_r0_mean_uOhm": fm["d_r0_mean_uOhm"],
+            "d_r0_i_uOhm": fm["d_r0_i_uOhm"],
+            "s_end_post_err_pp": float(fm.get("s_end_post_err", float("nan")) * 1e2),
             "rmse_frozen_true_mV": rmse0 * 1e3,
             "k_at_ref": [1.0, 1.0],
             "k_at_mean": [1.0, 1.0],
         }
         if do_k:
-            model = KGridAdapter(base).to(device)
+            model = KGridAdapter(base, r0_scale=args.r0_scale).to(device)
             kg = run_cell_kgrid(
                 model,
                 seq_ah,
@@ -578,6 +628,8 @@ def main() -> None:
                 args,
                 pack_blocked=bool(gate["blocked"]),
                 nogate=nogate,
+                trips=trips,
+                k_after_trips=int(args.k_after_trips),
             )
             row.update(kg)
             rmse1 = overall_rmse(model, [seq_true], scaler, cfg, device)
@@ -585,7 +637,7 @@ def main() -> None:
             print(
                 f"  kgrid {i:03d} aged={int(cell['aged'])}  "
                 f"k_ref=({kg['k_at_ref'][0]:.3f},{kg['k_at_ref'][1]:.3f})  "
-                f"upd={kg['n_update']}/{kg['n_win']}  "
+                f"upd={kg['n_update']}/{kg['n_win']}  skip_trip={kg['n_skip_trip']}  "
                 f"rmse {rmse0*1e3:.2f}→{rmse1*1e3:.2f} mV",
                 flush=True,
             )
@@ -625,6 +677,14 @@ def main() -> None:
             "rmse_frozen_aged_mV": float(np.mean([g["rmse_frozen_true_mV"] for g in aged])) if aged else float("nan"),
             "rmse_frozen_nom_mV": float(np.mean([g["rmse_frozen_true_mV"] for g in nom])) if nom else float("nan"),
         }
+    dr_end = np.array([r["d_r0_end_uOhm"] for r in rows], dtype=float)
+    dr_i = np.array([r["d_r0_i_uOhm"] for r in rows], dtype=float)
+    dr_m = np.array([r["d_r0_mean_uOhm"] for r in rows], dtype=float)
+    se = np.array([r["s_end_post_err_pp"] for r in rows], dtype=float)
+    summary["d_r0_p50_uOhm"] = float(np.percentile(dr_end, 50))
+    summary["d_r0_mean_uOhm"] = float(np.median(dr_m))
+    summary["d_r0_i_p50_uOhm"] = float(np.nanmedian(dr_i))
+    summary["s_post_err_p50_pp"] = float(np.median(se))
     out_dir.mkdir(parents=True, exist_ok=True)
     report = {
         "mode": args.mode,
@@ -634,6 +694,9 @@ def main() -> None:
         "engine": meta.get("engine"),
         "n": n,
         "b_I": meta.get("b_I"),
+        "r0_scale": args.r0_scale,
+        "dr0": bool(args.dr0),
+        "k_after_trips": int(args.k_after_trips),
         "optimizer": "SGD",
         "replay": False,
         "read_old_grid": False,
@@ -657,11 +720,14 @@ def main() -> None:
             {f"cell_{r['id']}": {"k_at_ref": r["k_at_ref"], "k_tables": r.get("k_tables")} for r in rows},
             out_dir / "last.pt",
         )
-        if summary.get("n_aged", 0) == 0 and "k0_p50" in summary:
+        if "k0_p50" in summary:
+            n_rep = summary["n_nom"] if summary.get("n_nom", 0) else summary.get("n_aged", n)
             print(
                 f"summary  k0 p50={summary['k0_p50']:.3f}  Δk_med={summary['dk0_median']:+.3f}  "
-                f"in_1±0.03={summary['n_k0_in_1pm03']}/{summary['n_nom']}  "
-                f"up/dn={summary['n_k0_up']}/{summary['n_k0_dn']}",
+                f"in_1±0.03={summary['n_k0_in_1pm03']}/{n_rep}  "
+                f"up/dn={summary['n_k0_up']}/{summary['n_k0_dn']}  "
+                f"δR0_I p50={summary['d_r0_i_p50_uOhm']:+.1f} µΩ  "
+                f"s_err p50={summary['s_post_err_p50_pp']:+.3f} pp",
                 flush=True,
             )
         else:
@@ -671,10 +737,22 @@ def main() -> None:
                 flush=True,
             )
     else:
+        print(
+            f"summary  δR0_I p50={summary['d_r0_i_p50_uOhm']:+.1f} µΩ  "
+            f"δR0_end p50={summary['d_r0_p50_uOhm']:+.1f} µΩ  "
+            f"s_err p50={summary['s_post_err_p50_pp']:+.3f} pp",
+            flush=True,
+        )
         if summary.get("n_aged", 0) == 0:
             print(
                 f"summary  freeze RMSE mean="
                 f"{summary['rmse_frozen_nom_mV']:.2f} mV",
+                flush=True,
+            )
+        elif summary.get("n_nom", 0) == 0:
+            print(
+                f"summary  freeze RMSE mean="
+                f"{summary['rmse_frozen_aged_mV']:.2f} mV",
                 flush=True,
             )
         else:
@@ -716,6 +794,29 @@ def main() -> None:
                 print(
                     f"WARN 2B ifx_demo 应全包同号大改 k（up/dn="
                     f"{summary.get('n_k0_up')}/{summary.get('n_k0_dn')}）"
+                )
+    if meta["exp"] == "2e":
+        if do_k and not nogate:
+            if gate["blocked"]:
+                print("WARN 2E 包级门不应触发")
+            k50 = float(summary.get("k0_p50", summary.get("k0_aged", 1.0)))
+            if k50 < 1.015:
+                print(f"WARN 2E 主档 k 应朝 1.15（k0 p50={k50:.3f}）")
+    if str(meta["exp"]).startswith("2d"):
+        if gate["blocked"]:
+            print(f"WARN {meta['exp']} 包级门不应触发")
+        if abs(args.r0_scale - 1.06) > 1e-3:
+            print(f"WARN {meta['exp']} 应用 --r0-scale 1.06（现在 {args.r0_scale:g}）")
+        if args.dr0 and summary.get("d_r0_i_p50_uOhm", 0.0) > -20.0:
+            print(
+                f"WARN {meta['exp']} 开 δR0 大电流段应朝负（|I|≥20 A p50="
+                f"{summary.get('d_r0_i_p50_uOhm'):+.1f} µΩ）"
+            )
+        if args.dr0 and int(args.k_after_trips) >= 3 and do_k:
+            if summary.get("n_k0_in_1pm03", n) < n:
+                print(
+                    f"WARN {meta['exp']} 主档第 3 趟前 k 应保持 1（in_1±0.03="
+                    f"{summary.get('n_k0_in_1pm03')}/{n}）"
                 )
 
 

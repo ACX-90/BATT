@@ -7,6 +7,9 @@
     python Src/Sim/nmc100ah_gen_pack.py --exp 2a3 --n 8 --seed 203 --out-dir Data/pack/2a3_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2a4 --n 8 --seed 204 --out-dir Data/pack/2a4_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2b --n 8 --seed 205 --out-dir Data/pack/2b_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2e --n 8 --seed 206 --out-dir Data/pack/2e_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2d1 --n 8 --seed 207 --out-dir Data/pack/2d1_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2d2 --n 8 --seed 207 --out-dir Data/pack/2d2_n8
 """
 from __future__ import annotations
 
@@ -89,6 +92,12 @@ def assign_cells(
             k = 1.0
             aged = False
         elif exp == "2b":
+            k = 1.0
+            aged = False
+        elif exp == "2e":
+            k = k_aged
+            aged = True
+        elif exp in {"2d1", "2d2"}:
             k = 1.0
             aged = False
         else:
@@ -253,6 +262,19 @@ def _simulate_cell(
     )
 
 
+def _repeat_trips(base: list[dict], n_trips: int, rest_s: float, *, dt_s: float) -> tuple[list[dict], list[int]]:
+    """同一条 SEQUENCE 串 n 次，中间休息 rest_s（06-a §5.4 2D2，~3τ1）。"""
+    seq: list[dict] = []
+    starts: list[int] = []
+    for i in range(int(n_trips)):
+        if i:
+            seq.append({"mode": "rest", "duration_s": float(rest_s)})
+        n_so_far = len(expand_sequence(seq, dt_s=dt_s, capacity_ah=100.0, t_default=25.0)) if seq else 0
+        starts.append(int(n_so_far))
+        seq.extend(list(base))
+    return seq, starts
+
+
 def generate_pack(
     *,
     exp: str,
@@ -280,8 +302,14 @@ def generate_pack(
             cell["q_ratio"] = draw["q_ratio"]
             cell["z_q"] = draw["z_q"]
             cell["channels"] = {"r0": draw["r0"], "r1": draw["r1"]}
-    seq = list(SEQ_CC_REST) if exp == "2b" else list(SEQUENCE)
     dt_s = DT_S
+    trip_starts = [0]
+    if exp == "2b":
+        seq = list(SEQ_CC_REST)
+    elif exp == "2d2":
+        seq, trip_starts = _repeat_trips(SEQUENCE, 3, 60.0, dt_s=dt_s)
+    else:
+        seq = list(SEQUENCE)
     plan = expand_sequence(seq, dt_s=dt_s, capacity_ah=100.0, t_default=25.0)
     n_steps = len(plan)
     i_true = np.array([p[2] for p in plan], dtype=float)
@@ -366,7 +394,9 @@ def generate_pack(
                 else None
             )
         ),
-        "wave": "cc_rest" if exp == "2b" else "sequence",
+        "wave": "cc_rest" if exp == "2b" else ("sequence_x3" if exp == "2d2" else "sequence"),
+        "trips": trip_starts,
+        "n_trips": len(trip_starts),
         "sequence": seq,
         "cells": cells,
         "noise_std": dict(NOISE_STD),
@@ -429,7 +459,7 @@ def generate_pack(
 
 def main() -> None:
     p = argparse.ArgumentParser(description="包级生成器：共享电流，按芯电压")
-    p.add_argument("--exp", default="2a1", choices=["2a1", "2a2", "2a3", "2a4", "2b"])
+    p.add_argument("--exp", default="2a1", choices=["2a1", "2a2", "2a3", "2a4", "2b", "2e", "2d1", "2d2"])
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--engine", default="pybamm", choices=["ecm", "pybamm"])
     p.add_argument("--out-dir", default=None)
@@ -442,9 +472,24 @@ def main() -> None:
     if args.exp == "2b" and args.engine == "pybamm":
         print("2b 零偏硬标准对齐 04-a F，改用 --engine ecm（不叠 SPM 墙）", flush=True)
         args.engine = "ecm"
+    if args.exp == "2e" and args.engine == "pybamm":
+        print("2e 电压形态对齐 1a 任务 A，改用 --engine ecm（不叠 SPM 墙）", flush=True)
+        args.engine = "ecm"
+    if args.exp in {"2d1", "2d2"} and args.engine == "pybamm":
+        print(f"{args.exp} 滤波层对照对齐 04-a E，改用 --engine ecm（BOL 真值，表偏在估计器）", flush=True)
+        args.engine = "ecm"
     seed = args.seed
     if seed is None:
-        seed = {"2a1": 201, "2a2": 202, "2a3": 203, "2a4": 204, "2b": 205}.get(args.exp, 201)
+        seed = {
+            "2a1": 201,
+            "2a2": 202,
+            "2a3": 203,
+            "2a4": 204,
+            "2b": 205,
+            "2e": 206,
+            "2d1": 207,
+            "2d2": 207,
+        }.get(args.exp, 201)
     out = args.out_dir or f"Data/pack/{args.exp}" + ("" if args.n >= 180 else f"_n{args.n}")
     generate_pack(
         exp=args.exp,

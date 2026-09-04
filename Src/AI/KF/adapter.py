@@ -101,11 +101,15 @@ class KGridAdapter(nn.Module):
         *,
         soc_node: tuple[float, ...] = KGRID_SOC,
         t_node: tuple[float, ...] = KGRID_T,
+        r0_scale: float = 1.0,
+        r1_scale: float = 1.0,
     ) -> None:
         super().__init__()
         self.base = base
         for p in self.base.parameters():
             p.requires_grad = False
+        self.r0_scale = float(r0_scale)
+        self.r1_scale = float(r1_scale)
         self.register_buffer("soc_node", torch.tensor(soc_node, dtype=torch.float32))
         self.register_buffer("t_node", torch.tensor(t_node, dtype=torch.float32))
         ns, nt = len(soc_node), len(t_node)
@@ -145,7 +149,7 @@ class KGridAdapter(nn.Module):
         r0, r1, c1 = self.base(x_norm)
         k0 = self.interp_k(self.log_k0, soc, t_c)
         k1 = self.interp_k(self.log_k1, soc, t_c)
-        return r0 * k0, r1 * k1, c1
+        return r0 * k0 * self.r0_scale, r1 * k1 * self.r1_scale, c1
 
     def k_tables(self) -> dict[str, list]:
         with torch.no_grad():

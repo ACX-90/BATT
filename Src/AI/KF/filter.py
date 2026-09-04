@@ -201,7 +201,14 @@ def filter_metrics(log: dict[str, np.ndarray]) -> dict[str, float]:
         "nis_mean": float(np.mean(log["nis"])),
         "s_end_ah": float(log["soc_ah"][-1]),
         "s_end_post": float(log["soc_post"][-1]),
+        "d_r0_end_uOhm": float(log["d_r0_ohm"][-1] * 1e6),
+        "d_r0_mean_uOhm": float(np.mean(log["d_r0_ohm"]) * 1e6),
     }
+    i_abs = np.abs(np.asarray(log.get("i_used_a", log["i_meas_a"]), dtype=float))
+    mask = i_abs >= 20.0
+    out["d_r0_i_uOhm"] = (
+        float(np.median(log["d_r0_ohm"][mask]) * 1e6) if np.any(mask) else float("nan")
+    )
     if "soc_true" in log:
         out["s_ah_rmse"] = rmse(log["soc_ah"] - log["soc_true"])
         out["s_post_rmse"] = rmse(log["soc_post"] - log["soc_true"])
