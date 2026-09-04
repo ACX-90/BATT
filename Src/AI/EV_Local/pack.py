@@ -72,6 +72,8 @@ def load_pack(pack_dir: Path) -> tuple[dict, dict[str, np.ndarray]]:
         raise RuntimeError(f"{exp} 必须 b_I=0")
     if exp == "2b" and abs(b_i - 5.0) > 1e-6:
         raise RuntimeError("2b 必须 b_I=5")
+    if exp == "2c" and abs(b_i - 5.0) > 1e-6:
+        raise RuntimeError("2c 必须 b_I=5")
     if exp == "2e" and abs(b_i) > 1e-6:
         raise RuntimeError("2e 必须 b_I=0")
     if exp.startswith("2d") and abs(b_i) > 1e-6:
@@ -164,6 +166,28 @@ def _trip_index(start: int, trips: list[int]) -> int:
     return idx
 
 
+def trip_pack_gates(
+    ds_mat: np.ndarray,
+    trips: list[int],
+    n_steps: int,
+    *,
+    dt_s: float,
+) -> list[dict]:
+    """按趟估包级门。2C：放电趟拦、脉冲趟不把整段 |m| 闩死（06-a §3.4）。"""
+    starts = [int(x) for x in (trips or [0])]
+    out: list[dict] = []
+    n = int(n_steps)
+    for i, t0 in enumerate(starts):
+        t1 = starts[i + 1] if i + 1 < len(starts) else n
+        lo, hi = max(int(t0), 0), max(int(t1), int(t0) + 1)
+        g = pack_gate(ds_mat[lo:hi], dt_s=dt_s)
+        g["trip"] = i
+        g["start"] = lo
+        g["end"] = min(hi, n)
+        out.append(g)
+    return out
+
+
 def _kgrid_args(args) -> SimpleNamespace:
     return SimpleNamespace(
         i_edge=args.i_edge,
@@ -190,6 +214,7 @@ def run_cell_kgrid(
     nogate: bool,
     trips: list[int] | None = None,
     k_after_trips: int = 1,
+    trip_blocked: list[bool] | None = None,
 ) -> dict:
     win = int(args.win)
     dt_s = cfg.dt_s
@@ -225,11 +250,15 @@ def run_cell_kgrid(
             i_np_all, start, dt_s=dt_s, i_edge_a=args.i_edge, i_prev=None
         )
         pol = window_policy(has_edge=bool(gstat["has_edge"]), last_edge_age_s=age)
-        if pack_blocked and not nogate:
+        ti = _trip_index(start, trip_starts)
+        blocked_now = bool(pack_blocked)
+        if trip_blocked is not None and ti < len(trip_blocked):
+            blocked_now = bool(trip_blocked[ti])
+        if blocked_now and not nogate:
             n_skip_pack += 1
             u_p0 = _roll_up(model, sl, u_p0, dt_s, len(i_np) // 2)
             continue
-        if _trip_index(start, trip_starts) < hold_until:
+        if ti < hold_until:
             n_skip_trip += 1
             u_p0 = _roll_up(model, sl, u_p0, dt_s, len(i_np) // 2)
             continue
@@ -581,13 +610,25 @@ def main() -> None:
         f"slope={gate.get('slope_pph', float('nan')):.3f} pp/h",
         flush=True,
     )
+    trips = [int(x) for x in meta.get("trips", [0])]
+    trip_gates = trip_pack_gates(
+        ds_mat, trips, int(ds_mat.shape[0]), dt_s=float(meta["dt_s"])
+    )
+    trip_blocked = [bool(g["blocked"]) for g in trip_gates]
+    if len(trip_gates) > 1:
+        for g in trip_gates:
+            print(
+                f"  trip {g['trip']} [{g['start']}:{g['end']}]  "
+                f"blocked={g['blocked']} reason={g['reason']}  "
+                f"m={g['m']*1e2:.3f} pp  hours={g.get('hours', float('nan')):.2f}",
+                flush=True,
+            )
 
     rows = []
     nogate = args.mode == "kgrid-nogate"
     do_k = args.mode in {"kgrid", "kgrid-nogate"}
     do_ifx_demo = args.mode == "ifx_demo"
     frozen_model = KGridAdapter(base, r0_scale=args.r0_scale).to(device)
-    trips = [int(x) for x in meta.get("trips", [0])]
     phi = None
     if do_ifx_demo:
         phi = _load_phi(_resolve(args.phi_dir), base, scaler, cfg, device)
@@ -595,8 +636,10 @@ def main() -> None:
         seq_true = cell_seq(
             data, i, soc=data["soc_true"][:, i], name=f"c{i:03d}_true", ocv=ocv_fn
         )
+        # 2C：放电段 s_ah 已被 5 A 零偏拉穿；脉冲写 k 用 s^-（休息电压已钉，06-a §3.4）。
+        soc_k = logs[i]["soc_pred"] if str(meta["exp"]) == "2c" else logs[i]["soc_ah"]
         seq_ah = cell_seq(
-            data, i, soc=logs[i]["soc_ah"], name=f"c{i:03d}_ah", ocv=ocv_fn
+            data, i, soc=soc_k, name=f"c{i:03d}_ah", ocv=ocv_fn
         )
         rmse0 = overall_rmse(frozen_model, [seq_true], scaler, cfg, device)
         fm = filter_metrics(logs[i])
@@ -630,6 +673,7 @@ def main() -> None:
                 nogate=nogate,
                 trips=trips,
                 k_after_trips=int(args.k_after_trips),
+                trip_blocked=trip_blocked,
             )
             row.update(kg)
             rmse1 = overall_rmse(model, [seq_true], scaler, cfg, device)
@@ -637,7 +681,8 @@ def main() -> None:
             print(
                 f"  kgrid {i:03d} aged={int(cell['aged'])}  "
                 f"k_ref=({kg['k_at_ref'][0]:.3f},{kg['k_at_ref'][1]:.3f})  "
-                f"upd={kg['n_update']}/{kg['n_win']}  skip_trip={kg['n_skip_trip']}  "
+                f"upd={kg['n_update']}/{kg['n_win']}  "
+                f"skip_pack={kg['n_skip_pack']} skip_trip={kg['n_skip_trip']}  "
                 f"rmse {rmse0*1e3:.2f}→{rmse1*1e3:.2f} mV",
                 flush=True,
             )
@@ -685,6 +730,17 @@ def main() -> None:
     summary["d_r0_mean_uOhm"] = float(np.median(dr_m))
     summary["d_r0_i_p50_uOhm"] = float(np.nanmedian(dr_i))
     summary["s_post_err_p50_pp"] = float(np.median(se))
+    if str(meta["exp"]) == "2c" and do_k:
+        aged_rows = [r for r, c in zip(rows, cells) if c["aged"] and "k_tables" in r]
+        nom_rows = [r for r, c in zip(rows, cells) if (not c["aged"]) and "k_tables" in r]
+
+        def _node_k0(group: list[dict]) -> float:
+            if not group:
+                return float("nan")
+            return float(np.mean([g["k_tables"]["k0"][0][2] for g in group]))
+
+        summary["k0_s010_t30_aged"] = _node_k0(aged_rows)
+        summary["k0_s010_t30_nom"] = _node_k0(nom_rows)
     out_dir.mkdir(parents=True, exist_ok=True)
     report = {
         "mode": args.mode,
@@ -697,10 +753,12 @@ def main() -> None:
         "r0_scale": args.r0_scale,
         "dr0": bool(args.dr0),
         "k_after_trips": int(args.k_after_trips),
+        "k_soc": "pred" if str(meta["exp"]) == "2c" else "ah",
         "optimizer": "SGD",
         "replay": False,
         "read_old_grid": False,
         "pack_gate": gate,
+        "trip_gates": trip_gates,
         "cells": [
             {k: v for k, v in r.items() if k not in {"k_tables", "hit0", "hit1"}}
             for r in rows
@@ -779,6 +837,29 @@ def main() -> None:
             print(f"WARN {meta['exp']} 包级门不应触发")
         if summary.get("n_k0_up", 0) == n or summary.get("n_k0_dn", 0) == n:
             print(f"WARN {meta['exp']} 全包同号，抽签或门可能写错")
+    if meta["exp"] == "2c" and do_k:
+        print(
+            f"summary  2C node s=0.10 T=30  k0 aged/nom="
+            f"{summary.get('k0_s010_t30_aged', float('nan')):.3f}/"
+            f"{summary.get('k0_s010_t30_nom', float('nan')):.3f}  "
+            f"upd aged/nom={summary.get('n_update_aged', float('nan')):.1f}/"
+            f"{summary.get('n_update_nom', float('nan')):.1f}",
+            flush=True,
+        )
+        if not nogate:
+            if not trip_blocked[0]:
+                print("WARN 2C 放电段包级门应触发")
+            if len(trip_blocked) > 1 and trip_blocked[1]:
+                print("WARN 2C 脉冲段门不应再拦（第一列不估 b_I，按趟放行）")
+            if summary.get("k0_s010_t30_nom", 1.0) > 1.08:
+                print(
+                    f"WARN 2C 未涨芯脉冲节点 k0={summary['k0_s010_t30_nom']:.3f} 偏高"
+                )
+            if summary.get("k0_s010_t30_aged", 1.0) < summary.get("k0_s010_t30_nom", 1.0) + 0.015:
+                print(
+                    f"WARN 2C 涨阻芯脉冲节点 k0={summary['k0_s010_t30_aged']:.3f} "
+                    f"相对未涨 {summary.get('k0_s010_t30_nom', 1.0):.3f} 没朝 1.15 走"
+                )
     if meta["exp"] == "2b":
         if do_k and not nogate:
             if not gate["blocked"]:

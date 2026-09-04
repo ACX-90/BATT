@@ -7,6 +7,7 @@
     python Src/Sim/nmc100ah_gen_pack.py --exp 2a3 --n 8 --seed 203 --out-dir Data/pack/2a3_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2a4 --n 8 --seed 204 --out-dir Data/pack/2a4_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2b --n 8 --seed 205 --out-dir Data/pack/2b_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2c --n 8 --seed 208 --out-dir Data/pack/2c_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2e --n 8 --seed 206 --out-dir Data/pack/2e_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2d1 --n 8 --seed 207 --out-dir Data/pack/2d1_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2d2 --n 8 --seed 207 --out-dir Data/pack/2d2_n8
@@ -94,6 +95,8 @@ def assign_cells(
         elif exp == "2b":
             k = 1.0
             aged = False
+        elif exp == "2c":
+            k = k_aged if aged else 1.0
         elif exp == "2e":
             k = k_aged
             aged = True
@@ -112,7 +115,7 @@ def assign_cells(
                 "q_ah": 100.0,
             }
         )
-    bias = 5.0 if exp == "2b" else float(b_i)
+    bias = 5.0 if exp in {"2b", "2c"} else float(b_i)
     return cells, bias
 
 
@@ -306,6 +309,15 @@ def generate_pack(
     trip_starts = [0]
     if exp == "2b":
         seq = list(SEQ_CC_REST)
+    elif exp == "2c":
+        # 06-a §2.4 / §5.3：cc_rest 后再接 SEQUENCE 的 1C 放电 + 回弹。
+        pulse = [
+            {"mode": "discharge", "duration_s": 180.0, "c_rate": 1.0},
+            {"mode": "rest", "duration_s": 120.0},
+        ]
+        seq = list(SEQ_CC_REST) + pulse
+        n_cc = len(expand_sequence(list(SEQ_CC_REST), dt_s=dt_s, capacity_ah=100.0, t_default=25.0))
+        trip_starts = [0, int(n_cc)]
     elif exp == "2d2":
         seq, trip_starts = _repeat_trips(SEQUENCE, 3, 60.0, dt_s=dt_s)
     else:
@@ -394,7 +406,11 @@ def generate_pack(
                 else None
             )
         ),
-        "wave": "cc_rest" if exp == "2b" else ("sequence_x3" if exp == "2d2" else "sequence"),
+        "wave": (
+            "cc_rest"
+            if exp == "2b"
+            else ("cc_rest_pulse" if exp == "2c" else ("sequence_x3" if exp == "2d2" else "sequence"))
+        ),
         "trips": trip_starts,
         "n_trips": len(trip_starts),
         "sequence": seq,
@@ -459,7 +475,11 @@ def generate_pack(
 
 def main() -> None:
     p = argparse.ArgumentParser(description="包级生成器：共享电流，按芯电压")
-    p.add_argument("--exp", default="2a1", choices=["2a1", "2a2", "2a3", "2a4", "2b", "2e", "2d1", "2d2"])
+    p.add_argument(
+        "--exp",
+        default="2a1",
+        choices=["2a1", "2a2", "2a3", "2a4", "2b", "2c", "2e", "2d1", "2d2"],
+    )
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--engine", default="pybamm", choices=["ecm", "pybamm"])
     p.add_argument("--out-dir", default=None)
@@ -471,6 +491,9 @@ def main() -> None:
         args.engine = "ecm"
     if args.exp == "2b" and args.engine == "pybamm":
         print("2b 零偏硬标准对齐 04-a F，改用 --engine ecm（不叠 SPM 墙）", flush=True)
+        args.engine = "ecm"
+    if args.exp == "2c" and args.engine == "pybamm":
+        print("2c 先拦后写对齐 2B 零偏 + SEQUENCE 1C 边沿，改用 --engine ecm", flush=True)
         args.engine = "ecm"
     if args.exp == "2e" and args.engine == "pybamm":
         print("2e 电压形态对齐 1a 任务 A，改用 --engine ecm（不叠 SPM 墙）", flush=True)
@@ -486,6 +509,7 @@ def main() -> None:
             "2a3": 203,
             "2a4": 204,
             "2b": 205,
+            "2c": 208,
             "2e": 206,
             "2d1": 207,
             "2d2": 207,
