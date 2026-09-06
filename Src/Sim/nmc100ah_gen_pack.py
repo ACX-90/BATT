@@ -1,8 +1,8 @@
 """包级生成器：一条真电流 → N_s 只电压（Doc/06-a §2 / §7）。
 
-默认 ECM；`--engine pybamm` 用 SPM 顶真包。2A3 / 2A4 真值是每芯通道，强制 ecm。不覆盖 Data/grid。
+默认 ECM；`--engine pybamm` 用 SPM 顶真包。2A1 / 2A2 / 2A3 / 2A4 及后续组请求 pybamm 时强制 ecm（不叠 SPM 墙）。不覆盖 Data/grid。
 
-    python Src/Sim/nmc100ah_gen_pack.py --exp 2a1 --n 8 --engine pybamm --out-dir Data/pack/2a1_smoke
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2a1 --n 8 --engine ecm --out-dir Data/pack/2a1_smoke
     python Src/Sim/nmc100ah_gen_pack.py --exp 2a1 --n 180 --engine ecm --out-dir Data/pack/2a1
     python Src/Sim/nmc100ah_gen_pack.py --exp 2a3 --n 8 --seed 203 --out-dir Data/pack/2a3_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2a4 --n 8 --seed 204 --out-dir Data/pack/2a4_n8
@@ -980,6 +980,9 @@ def main() -> None:
     p.add_argument("--park-dt", type=float, default=None, help="2H 采样秒；默认 5（门控仍按秒）")
     p.add_argument("--charge-min", type=float, default=None, help="2H3 充电分钟；默认 5")
     args = p.parse_args()
+    if args.exp in {"2a1", "2a2"} and args.engine == "pybamm":
+        print(f"{args.exp} 对齐后续相 2 组，改用 --engine ecm（不叠 SPM 墙）", flush=True)
+        args.engine = "ecm"
     if args.exp in {"2a3", "2a4"} and args.engine == "pybamm":
         print(f"{args.exp} 真值是每芯通道 / Q_i，改用 --engine ecm", flush=True)
         args.engine = "ecm"
