@@ -242,6 +242,7 @@ def simulate(
     rc2: bool | None = None,
     u_p2_0: float = 0.0,
     soc_capacity_ah: float | None = None,
+    i_override: np.ndarray | None = None,
 ) -> dict[str, np.ndarray]:
     cell = model.params.cell
     lim = model.params.validity
@@ -255,7 +256,13 @@ def simulate(
         sequence, dt_s=dt_s, capacity_ah=cell.capacity_ah, t_default=t_ambient_c
     )
     n = len(plan)
+    i_ov = None
+    if i_override is not None:
+        i_ov = np.asarray(i_override, dtype=float).reshape(-1)
+        if i_ov.shape[0] != n:
+            raise ValueError(f"i_override 长度 {i_ov.shape[0]} != plan {n}")
     # 电流按铭牌 C 率（包共享 I）；真 SOC 可用每芯 Q_i（2A4）。
+    # 2I 抖动 / 驾驶：i_override 覆盖逐步电流，不改 SEQUENCE 头。
     q_as = float(cell.capacity_ah if soc_capacity_ah is None else soc_capacity_ah) * 3600.0
 
     extra = []
@@ -272,7 +279,8 @@ def simulate(
     cutoff_cmd: int | None = None
 
     for k, (cmd_id, mode, i_cmd, t_cmd) in enumerate(plan):
-        i_a = 0.0 if (cutoff_cmd is not None and cmd_id == cutoff_cmd) else float(i_cmd)
+        i_base = float(i_ov[k]) if i_ov is not None else float(i_cmd)
+        i_a = 0.0 if (cutoff_cmd is not None and cmd_id == cutoff_cmd) else i_base
         mode_k = "rest" if i_a == 0.0 and mode != "rest" and cutoff_cmd == cmd_id else mode
 
         soc_param = float(np.clip(soc, lim.soc_min, lim.soc_max))

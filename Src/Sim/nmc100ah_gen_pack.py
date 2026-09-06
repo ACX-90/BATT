@@ -16,6 +16,10 @@
     python Src/Sim/nmc100ah_gen_pack.py --exp 2h1 --n 180 --seed 210 --out-dir Data/pack/2h1
     python Src/Sim/nmc100ah_gen_pack.py --exp 2h3 --n 8 --seed 212 --park-h 1 --charge-min 5 --out-dir Data/pack/2h3_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2h3 --n 180 --seed 212 --out-dir Data/pack/2h3
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2i1 --n 8 --seed 213 --engine ecm --out-dir Data/pack/2i1_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2i1 --n 180 --seed 213 --engine ecm --out-dir Data/pack/2i1
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2i2 --n 180 --seed 214 --engine ecm --out-dir Data/pack/2i2
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2i3 --n 180 --seed 215 --engine ecm --out-dir Data/pack/2i3
 """
 from __future__ import annotations
 
@@ -45,6 +49,7 @@ from nmc100ah_gen import (  # noqa: E402
     simulate as ecm_simulate,
 )
 from nmc100ah_gen_long import SEQ_CC_REST  # noqa: E402
+from nmc100ah_2i_waves import build_pack_wave  # noqa: E402
 
 FORBIDDEN_OUT = {
     "Data/grid",
@@ -273,7 +278,8 @@ def assign_cells(
         soc0 = float(np.clip(rng.normal(0.70, 0.01), 0.65, 0.75))
         t_c = t_nom
         k = 1.0
-        if exp == "2a1":
+        if exp in {"2a1", "2i1", "2i2", "2i3"}:
+            # 2I 默认复用 2A1 赋芯：~20 只 k=1.15 / 其余 k=1（06-a §5.9）
             k = k_aged if aged else 1.0
         elif exp == "2a2":
             if aged:
@@ -428,6 +434,7 @@ def _simulate_cell(
     dt_s: float,
     noise_seed: int,
     verbose: bool,
+    i_override: np.ndarray | None = None,
 ) -> dict[str, np.ndarray]:
     if engine == "ecm":
         if cell.get("channels"):
@@ -447,7 +454,10 @@ def _simulate_cell(
             noise_seed=noise_seed,
             enable_cutoff=ENABLE_CUTOFF,
             soc_capacity_ah=soc_q,
+            i_override=i_override,
         )
+    if i_override is not None:
+        raise RuntimeError("i_override 仅支持 --engine ecm（2I）")
     from nmc100ah_pybamm import simulate as pybamm_simulate
 
     return pybamm_simulate(
@@ -699,8 +709,33 @@ def generate_pack(
 
     dt_s = DT_S
     trip_starts = [0]
-    if exp in {"2b", "2g"}:
+    i_override = None
+    wave_meta: dict | None = None
+    if exp in {"2i1", "2i2", "2i3"}:
+        if engine != "ecm":
+            raise RuntimeError("2I 强制 --engine ecm（共享 I(t) + i_override）")
+        if abs(b_i) > 1e-12:
+            raise RuntimeError("2I 必须 b_I=0")
+        wave_meta = build_pack_wave(exp, dt_s=dt_s, capacity_ah=100.0)
+        seq = list(wave_meta["seq"])
+        i_true = np.asarray(wave_meta["i_true"], dtype=float)
+        i_override = i_true
+        n_steps = int(len(i_true))
+        time_s = np.asarray(wave_meta["time_s"], dtype=float)
+        # cmd_id：用 expand 的 id，保证与 seq 对齐
+        plan = expand_sequence(seq, dt_s=dt_s, capacity_ah=100.0, t_default=25.0)
+        if len(plan) != n_steps:
+            raise RuntimeError(f"2I plan/i_true 长度不一致 {len(plan)} vs {n_steps}")
+        cmd_id = np.array([p[0] for p in plan], dtype=float)
+        if wave_meta.get("trips"):
+            trip_starts = [int(x) for x in wave_meta["trips"]]
+    elif exp in {"2b", "2g"}:
         seq = list(SEQ_CC_REST)
+        plan = expand_sequence(seq, dt_s=dt_s, capacity_ah=100.0, t_default=25.0)
+        n_steps = len(plan)
+        i_true = np.array([p[2] for p in plan], dtype=float)
+        time_s = np.arange(n_steps, dtype=float) * dt_s
+        cmd_id = np.array([p[0] for p in plan], dtype=float)
     elif exp == "2c":
         # 06-a §2.4 / §5.3：cc_rest 后再接 SEQUENCE 的 1C 放电 + 回弹。
         pulse = [
@@ -710,15 +745,25 @@ def generate_pack(
         seq = list(SEQ_CC_REST) + pulse
         n_cc = len(expand_sequence(list(SEQ_CC_REST), dt_s=dt_s, capacity_ah=100.0, t_default=25.0))
         trip_starts = [0, int(n_cc)]
+        plan = expand_sequence(seq, dt_s=dt_s, capacity_ah=100.0, t_default=25.0)
+        n_steps = len(plan)
+        i_true = np.array([p[2] for p in plan], dtype=float)
+        time_s = np.arange(n_steps, dtype=float) * dt_s
+        cmd_id = np.array([p[0] for p in plan], dtype=float)
     elif exp == "2d2":
         seq, trip_starts = _repeat_trips(SEQUENCE, 3, 60.0, dt_s=dt_s)
+        plan = expand_sequence(seq, dt_s=dt_s, capacity_ah=100.0, t_default=25.0)
+        n_steps = len(plan)
+        i_true = np.array([p[2] for p in plan], dtype=float)
+        time_s = np.arange(n_steps, dtype=float) * dt_s
+        cmd_id = np.array([p[0] for p in plan], dtype=float)
     else:
         seq = list(SEQUENCE)
-    plan = expand_sequence(seq, dt_s=dt_s, capacity_ah=100.0, t_default=25.0)
-    n_steps = len(plan)
-    i_true = np.array([p[2] for p in plan], dtype=float)
-    time_s = np.arange(n_steps, dtype=float) * dt_s
-    cmd_id = np.array([p[0] for p in plan], dtype=float)
+        plan = expand_sequence(seq, dt_s=dt_s, capacity_ah=100.0, t_default=25.0)
+        n_steps = len(plan)
+        i_true = np.array([p[2] for p in plan], dtype=float)
+        time_s = np.arange(n_steps, dtype=float) * dt_s
+        cmd_id = np.array([p[0] for p in plan], dtype=float)
 
     u_t_true = np.empty((n_steps, n), dtype=np.float32)
     soc_true = np.empty((n_steps, n), dtype=np.float32)
@@ -727,6 +772,14 @@ def generate_pack(
     cutoff = np.zeros((n_steps, n), dtype=np.float32)
 
     print(f"gen_pack exp={exp} n={n} engine={engine} seed={seed} b_I={b_i:g} A", flush=True)
+    if wave_meta is not None:
+        eg = wave_meta["edge"]
+        print(
+            f"  wave={wave_meta['wave']}  steps={eg['n_steps']}  dur={eg['duration_s']:.1f}s  "
+            f"edge_frac={eg['edge_frac']:.6f} ({eg['n_edge']}/{eg['n_di']})  "
+            f"jitter_seed={wave_meta.get('jitter_seed')} rms={wave_meta.get('jitter_rms_a')}",
+            flush=True,
+        )
     for i, cell in enumerate(cells):
         extra = ""
         if cell.get("channels"):
@@ -748,6 +801,7 @@ def generate_pack(
             dt_s=dt_s,
             noise_seed=seed + 17 * i,
             verbose=(i == 0 and engine == "pybamm"),
+            i_override=i_override,
         )
         u_cell = np.asarray(data["u_t_true_v"], dtype=float)
         if engine == "pybamm" and abs(float(cell["k"]) - 1.0) > 1e-12:
@@ -799,17 +853,36 @@ def generate_pack(
             )
         ),
         "wave": (
-            "cc_rest"
-            if exp in {"2b", "2g"}
-            else ("cc_rest_pulse" if exp == "2c" else ("sequence_x3" if exp == "2d2" else "sequence"))
+            wave_meta["wave"]
+            if wave_meta is not None
+            else (
+                "cc_rest"
+                if exp in {"2b", "2g"}
+                else ("cc_rest_pulse" if exp == "2c" else ("sequence_x3" if exp == "2d2" else "sequence"))
+            )
         ),
         "trips": trip_starts,
         "n_trips": len(trip_starts),
         "sequence": seq,
         "cells": cells,
         "noise_std": dict(NOISE_STD),
-        "note": "共享 I_true / I_meas（零偏一个数）；电压按芯。估计器只看见 I_meas。",
+        "note": (
+            wave_meta["note"]
+            if wave_meta is not None
+            else "共享 I_true / I_meas（零偏一个数）；电压按芯。估计器只看见 I_meas。"
+        ),
     }
+    if wave_meta is not None:
+        meta["edge"] = dict(wave_meta["edge"])
+        meta["jitter_seed"] = wave_meta.get("jitter_seed")
+        meta["jitter_rms_a"] = wave_meta.get("jitter_rms_a")
+        if "edge_clean" in wave_meta:
+            meta["edge_clean"] = dict(wave_meta["edge_clean"])
+        if "jitter_rms_active" in wave_meta:
+            meta["jitter_rms_active"] = wave_meta["jitter_rms_active"]
+        meta["hat_q_ah"] = 100.0
+        meta["capacity_ah_true"] = 100.0
+        meta["capacity_scale"] = 1.0
     if exp == "2g":
         # BMS 规格书分母错：CSV / 真值 Qi 仍 100 Ah；EKF/Ah 用 hatQ=95 Ah。
         meta["capacity_ah_true"] = 100.0
@@ -879,7 +952,24 @@ def main() -> None:
     p.add_argument(
         "--exp",
         default="2a1",
-        choices=["2a1", "2a2", "2a3", "2a4", "2b", "2c", "2e", "2d1", "2d2", "2g", "2h1", "2h2", "2h3"],
+        choices=[
+            "2a1",
+            "2a2",
+            "2a3",
+            "2a4",
+            "2b",
+            "2c",
+            "2e",
+            "2d1",
+            "2d2",
+            "2g",
+            "2h1",
+            "2h2",
+            "2h3",
+            "2i1",
+            "2i2",
+            "2i3",
+        ],
     )
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--engine", default="pybamm", choices=["ecm", "pybamm"])
@@ -911,6 +1001,9 @@ def main() -> None:
     if args.exp in {"2h1", "2h2", "2h3"} and args.engine == "pybamm":
         print(f"{args.exp} AFE 停放对齐 06-a §5.7，改用 --engine ecm（不叠 SPM / 2B）", flush=True)
         args.engine = "ecm"
+    if args.exp in {"2i1", "2i2", "2i3"} and args.engine == "pybamm":
+        print(f"{args.exp} 驾驶/斜坡/震荡对齐 06-a §5.9，改用 --engine ecm", flush=True)
+        args.engine = "ecm"
     seed = args.seed
     if seed is None:
         seed = {
@@ -927,6 +1020,9 @@ def main() -> None:
             "2h1": 210,
             "2h2": 211,
             "2h3": 212,
+            "2i1": 213,
+            "2i2": 214,
+            "2i3": 215,
         }.get(args.exp, 201)
     out = args.out_dir or f"Data/pack/{args.exp}" + ("" if args.n >= 180 else f"_n{args.n}")
     generate_pack(

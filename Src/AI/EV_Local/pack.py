@@ -80,6 +80,9 @@ def load_pack(pack_dir: Path) -> tuple[dict, dict[str, np.ndarray]]:
         raise RuntimeError("2e 必须 b_I=0")
     if exp.startswith("2d") and abs(b_i) > 1e-6:
         raise RuntimeError(f"{exp} 必须 b_I=0")
+    if exp in {"2i1", "2i2", "2i3"}:
+        if abs(b_i) > 1e-6:
+            raise RuntimeError(f"{exp} 必须 b_I=0（不要叠 2B）")
     if exp in {"2h1", "2h2", "2h3"}:
         if abs(b_i) > 1e-6:
             raise RuntimeError(f"{exp} 必须 b_I=0（不要叠 2B）")
@@ -1236,6 +1239,51 @@ def main() -> None:
             k50 = float(summary.get("k0_p50", summary.get("k0_aged", 1.0)))
             if k50 < 1.015:
                 print(f"WARN 2E 主档 k 应朝 1.15（k0 p50={k50:.3f}）")
+    if str(meta["exp"]).startswith("2i") and do_k and not nogate:
+        # 06-a §5.9：b_I=0 → 写 k 的包门不拦；2I1 斜坡不写假 k0；2I2/2I3 仍要 2A 类隔离
+        # 2I3 整段 ~24 min 可能踩中 ≥15 min 斜率备份（整轨报表）；写路径看按趟门
+        if meta["exp"] == "2i3":
+            if any(trip_blocked):
+                print(
+                    f"WARN 2i3 按趟包门不应触发（blocked trips="
+                    f"{[i for i, b in enumerate(trip_blocked) if b]}）"
+                )
+            elif gate["blocked"]:
+                print(
+                    f"NOTE 2i3 整轨 gate blocked={gate['reason']} "
+                    f"（≥15 min 斜率备份；写 k 已按趟放行）"
+                )
+        elif gate["blocked"]:
+            print(f"WARN {meta['exp']} 包级门不应触发（b_I=0）")
+        edge = meta.get("edge") or {}
+        if edge:
+            print(
+                f"summary  2I edge_frac={edge.get('edge_frac', float('nan')):.6f} "
+                f"({edge.get('n_edge', '?')}/{edge.get('n_di', '?')})  "
+                f"max|ΔI|={edge.get('max_abs_di', float('nan')):.2f} A",
+                flush=True,
+            )
+        if meta["exp"] == "2i1":
+            # 斜坡爬升不开门：未涨芯不应被抖/假边沿抬走
+            if summary.get("n_nom", 0) and float(summary.get("k0_nom", 1.0)) > 1.08:
+                print(
+                    f"WARN 2I1 未涨芯 k0={summary['k0_nom']:.3f} 偏高（斜坡不应假写 k0）"
+                )
+            n_edge = int(edge.get("n_edge", -1)) if edge else -1
+            if n_edge > 0:
+                print(f"NOTE 2I1 n_edge={n_edge}（预览期望 0；查 ramp 是否写错）")
+        if meta["exp"] in {"2i2", "2i3"}:
+            if summary.get("n_aged", 0) and summary.get("n_nom", 0):
+                if float(summary.get("k0_aged", 1.0)) < float(summary.get("k0_nom", 1.0)) + 0.01:
+                    print(
+                        f"WARN {meta['exp']} 涨阻芯 k0={summary['k0_aged']:.3f} "
+                        f"相对未涨 {summary['k0_nom']:.3f} 隔离偏弱"
+                    )
+                # 未涨芯 k0 中位应靠近 1（相对涨阻芯）
+                if n >= 180 and float(summary.get("k0_nom", 1.0)) > 1.05:
+                    print(
+                        f"WARN {meta['exp']} 未涨芯 k0={summary['k0_nom']:.3f} 偏高"
+                    )
     if str(meta["exp"]).startswith("2d"):
         if gate["blocked"]:
             print(f"WARN {meta['exp']} 包级门不应触发")
