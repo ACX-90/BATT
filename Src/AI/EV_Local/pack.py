@@ -80,18 +80,35 @@ def load_pack(pack_dir: Path) -> tuple[dict, dict[str, np.ndarray]]:
         raise RuntimeError("2e 必须 b_I=0")
     if exp.startswith("2d") and abs(b_i) > 1e-6:
         raise RuntimeError(f"{exp} 必须 b_I=0")
-    if exp in {"2h1", "2h2"}:
+    if exp in {"2h1", "2h2", "2h3"}:
         if abs(b_i) > 1e-6:
             raise RuntimeError(f"{exp} 必须 b_I=0（不要叠 2B）")
         if "i_cell" not in data:
             raise RuntimeError(f"{exp} pack.npz 缺 i_cell（AFE 真电流）")
-        # 分流器测量不得偷带 AFE
-        i_m = abs(float(np.median(np.asarray(data["i_meas"], dtype=float))))
-        i_c = float(np.median(np.asarray(data["i_cell"], dtype=float)))
-        if i_m > 0.05:
-            raise RuntimeError(f"{exp} I_meas 中位 {i_m:.4f} A，停放应≈0")
-        if i_c < 0.005:
-            raise RuntimeError(f"{exp} I_cell 中位 {i_c:.4f} A，应有 ~12 mA AFE")
+        i_meas = np.asarray(data["i_meas"], dtype=float)
+        i_cell = np.asarray(data["i_cell"], dtype=float)
+        if exp == "2h3":
+            n_chg = int(meta.get("n_charge_steps", 0))
+            if n_chg < 2:
+                raise RuntimeError("2h3 缺 n_charge_steps（应先 1C 充再停）")
+            # 充段 I_meas≈−100 A；停放段分流器≈0，I_cell≈12 mA
+            i_m_chg = float(np.median(i_meas[:n_chg]))
+            i_m_park = abs(float(np.median(i_meas[n_chg:])))
+            i_c_park = float(np.median(i_cell[n_chg:]))
+            if i_m_chg > -50.0:
+                raise RuntimeError(f"2h3 充段 I_meas 中位 {i_m_chg:.2f} A，应≈−100 A")
+            if i_m_park > 0.05:
+                raise RuntimeError(f"2h3 停放 I_meas 中位 {i_m_park:.4f} A，应≈0")
+            if i_c_park < 0.005:
+                raise RuntimeError(f"2h3 停放 I_cell 中位 {i_c_park:.4f} A，应有 ~12 mA AFE")
+        else:
+            # 分流器测量不得偷带 AFE
+            i_m = abs(float(np.median(i_meas)))
+            i_c = float(np.median(i_cell))
+            if i_m > 0.05:
+                raise RuntimeError(f"{exp} I_meas 中位 {i_m:.4f} A，停放应≈0")
+            if i_c < 0.005:
+                raise RuntimeError(f"{exp} I_cell 中位 {i_c:.4f} A，应有 ~12 mA AFE")
     return meta, data
 
 
@@ -246,6 +263,7 @@ def run_cell_kgrid(
     trip_starts = [int(x) for x in (trips or [0])]
     hold_until = max(int(k_after_trips) - 1, 0)
     # 2H 快路径：全程无边沿 + 主档停放门 → 全部 park skip，不必逐步 SGD
+    min_len = max(win // 4, max(1, int(round(2.0 / float(dt_s)))))
     if (
         not disable_park_gate
         and not nogate
@@ -253,8 +271,8 @@ def run_cell_kgrid(
         and float(np.max(np.abs(i_np_all))) < float(args.rest_eps)
     ):
         n_win = max(1, (n + win - 1) // win)
-        # 末窗太短时与主循环一致少计
-        if n - (n_win - 1) * win < max(win // 4, 20) and n_win > 1:
+        # 末窗太短时与主循环一致少计（≥2 s 墙钟，兼容 dt=5 s 停放）
+        if n - (n_win - 1) * win < min_len and n_win > 1:
             n_win -= 1
         n_skip_park = n_win
         k_ref = model.k_at(0.50, 25.0)
@@ -272,9 +290,101 @@ def run_cell_kgrid(
             "hit0": hit0.tolist(),
             "hit1": hit1.tolist(),
         }
+    # 2H3：前缀有大电流、其后长时间 |I|≈0 → 只逐步走充段，停放整段记 skip_park
+    if (
+        not disable_park_gate
+        and not nogate
+        and not pack_blocked
+        and float(np.max(np.abs(i_np_all))) >= float(args.i_edge)
+    ):
+        abs_i = np.abs(i_np_all)
+        # 最后一次 |I|≥边沿 之后的下标
+        big = np.flatnonzero(abs_i >= float(args.i_edge))
+        if big.size > 0:
+            park0 = int(big[-1]) + 1
+            # 停放占比够大才走快路径（避免误伤 2C 等）
+            if park0 < n and (n - park0) >= int(0.8 * n) and (n - park0) * dt_s >= 1800.0:
+                # 先逐步处理 [0, park0)
+                n_win = n_upd = n_skip_gate = n_skip_pack = n_skip_park = n_skip_trip = 0
+                kg_args = _kgrid_args(args)
+                u_p0_local = u_p0
+                hold_until = max(int(k_after_trips) - 1, 0)
+                trip_starts = [int(x) for x in (trips or [0])]
+                for start in range(0, park0, win):
+                    end = min(start + win, park0)
+                    if end - start < min_len:
+                        break
+                    n_win += 1
+                    sl = {k: v[start:end] for k, v in t.items()}
+                    i_prev = float(i_np_all[start - 1]) if start > 0 else None
+                    i_np = i_np_all[start:end]
+                    gated, gstat = window_gate(
+                        i_np,
+                        dt_s=dt_s,
+                        i_edge_a=args.i_edge,
+                        rest_eps=args.rest_eps,
+                        rest_s=args.rest_s,
+                        i_prev=i_prev,
+                    )
+                    age = last_edge_age_s(
+                        i_np_all, start, dt_s=dt_s, i_edge_a=args.i_edge, i_prev=None
+                    )
+                    pol = window_policy(has_edge=bool(gstat["has_edge"]), last_edge_age_s=age)
+                    ti = _trip_index(start, trip_starts)
+                    if ti < hold_until:
+                        n_skip_trip += 1
+                        u_p0_local = _roll_up(model, sl, u_p0_local, dt_s, len(i_np) // 2)
+                        continue
+                    if (not disable_park_gate) and (not pol["write_k"]):
+                        n_skip_park += 1
+                        u_p0_local = _roll_up(model, sl, u_p0_local, dt_s, len(i_np) // 2)
+                        continue
+                    if not pol["allow_k1"]:
+                        kg_args.rest_s = 1e9
+                    else:
+                        kg_args.rest_s = args.rest_s
+                    st = step_window(
+                        model,
+                        opt,
+                        sl,
+                        u_p0_local,
+                        dt_s=dt_s,
+                        i_np=i_np,
+                        args=kg_args,
+                        i_prev=i_prev,
+                        hit0=hit0,
+                        hit1=hit1,
+                    )
+                    u_p0_local = st["u_p0"]
+                    if st["updated"]:
+                        n_upd += 1
+                    else:
+                        n_skip_gate += 1
+                # 停放段整段 skip_park
+                n_park_win = max(0, (n - park0 + win - 1) // win)
+                if n - park0 - (n_park_win - 1) * win < min_len and n_park_win > 1:
+                    n_park_win -= 1
+                n_win += n_park_win
+                n_skip_park += n_park_win
+                k_ref = model.k_at(0.50, 25.0)
+                k_mean = model.k_at(float(seq["soc"].mean()), float(seq["t"].mean()))
+                return {
+                    "n_win": n_win,
+                    "n_update": n_upd,
+                    "n_skip_gate": n_skip_gate,
+                    "n_skip_pack": n_skip_pack,
+                    "n_skip_park": n_skip_park,
+                    "n_skip_trip": n_skip_trip,
+                    "k_at_ref": list(k_ref),
+                    "k_at_mean": list(k_mean),
+                    "k_tables": model.k_tables(),
+                    "hit0": hit0.tolist(),
+                    "hit1": hit1.tolist(),
+                }
+    min_len = max(win // 4, max(1, int(round(2.0 / float(dt_s)))))
     for start in range(0, n, win):
         end = min(start + win, n)
-        if end - start < max(win // 4, 20):
+        if end - start < min_len:
             break
         n_win += 1
         sl = {k: v[start:end] for k, v in t.items()}
@@ -835,6 +945,7 @@ def main() -> None:
     slice_24h = None
     s_ah_pin = None
     up_end = None
+    rebound = None
     if str(meta.get("exp", "")).startswith("2h"):
         idx24 = int(round(24.0 * 3600.0 / dt_pack))
         if ds_mat.shape[0] > idx24:
@@ -856,18 +967,34 @@ def main() -> None:
                 f"ds_p50={slice_24h['ds_p50_pp']:+.3f} pp",
                 flush=True,
             )
-        s0 = np.array([float(c["soc0"]) for c in cells], dtype=float)
-        s_ah_end = np.array([float(logs[i]["soc_ah"][-1]) for i in range(n)], dtype=float)
-        s_ah_pin = {
-            "s0_p50": float(np.median(s0)),
-            "s_ah_end_p50": float(np.median(s_ah_end)),
-            "max_abs_drift_pp": float(np.max(np.abs(s_ah_end - s0)) * 1e2),
-        }
-        print(
-            f"s_ah_pin  max|Δ|={s_ah_pin['max_abs_drift_pp']:.4f} pp  "
-            f"(应≈0，禁止把 12 mA 估进 hat b_I)",
-            flush=True,
-        )
+        if str(meta.get("exp")) == "2h3":
+            n_chg = int(meta.get("n_charge_steps", 0))
+            s_ref = np.array([float(logs[i]["soc_ah"][n_chg]) for i in range(n)], dtype=float)
+            s_ah_end = np.array([float(logs[i]["soc_ah"][-1]) for i in range(n)], dtype=float)
+            s_ah_pin = {
+                "scope": "park_only",
+                "s_park0_p50": float(np.median(s_ref)),
+                "s_ah_end_p50": float(np.median(s_ah_end)),
+                "max_abs_drift_pp": float(np.max(np.abs(s_ah_end - s_ref)) * 1e2),
+            }
+            print(
+                f"s_ah_pin(park)  max|Δ|={s_ah_pin['max_abs_drift_pp']:.4f} pp  "
+                f"(停放段应≈0；充段安时会动)",
+                flush=True,
+            )
+        else:
+            s0 = np.array([float(c["soc0"]) for c in cells], dtype=float)
+            s_ah_end = np.array([float(logs[i]["soc_ah"][-1]) for i in range(n)], dtype=float)
+            s_ah_pin = {
+                "s0_p50": float(np.median(s0)),
+                "s_ah_end_p50": float(np.median(s_ah_end)),
+                "max_abs_drift_pp": float(np.max(np.abs(s_ah_end - s0)) * 1e2),
+            }
+            print(
+                f"s_ah_pin  max|Δ|={s_ah_pin['max_abs_drift_pp']:.4f} pp  "
+                f"(应≈0，禁止把 12 mA 估进 hat b_I)",
+                flush=True,
+            )
         if "u_p" in data:
             up_last = np.asarray(data["u_p"][-1], dtype=float)
             up_end = {
@@ -880,6 +1007,43 @@ def main() -> None:
                 f"u_p_end  p50={up_end['p50_uV']:.2f} µV（久置稳态 ~I·R1，不是 0）",
                 flush=True,
             )
+        # 2H3：切停放后 Up 应从负（充电极化）往 0 回，不能像放电回弹（正→0）
+        if str(meta.get("exp")) == "2h3" and "u_p" in data:
+            n_chg = int(meta.get("n_charge_steps", 0))
+            up = np.asarray(data["u_p"], dtype=float)
+            if n_chg >= 2 and up.shape[0] > n_chg + 10:
+                up_chg_end = up[n_chg - 1]
+                # 停放后 30 min（或所能达到的长度）
+                n_reb = min(up.shape[0] - n_chg, int(round(30 * 60 / dt_pack)))
+                up_reb = up[n_chg : n_chg + n_reb]
+                # 中位轨迹
+                tr = np.median(up_reb, axis=1)
+                up0 = float(np.median(up_chg_end))
+                up_1min = float(tr[min(len(tr) - 1, max(1, int(round(60 / dt_pack))))])
+                up_5min = float(tr[min(len(tr) - 1, max(1, int(round(300 / dt_pack))))])
+                up_30min = float(tr[-1])
+                # 充电回弹：Up0 < 0，随后单调往 0 抬（电压往下掉）
+                charge_like = up0 < -0.01 and up_30min > up0 and up_30min < 0.005
+                discharge_like = up0 > 0.01  # 错成放电支路建立正极化
+                rebound = {
+                    "n_reb_steps": int(n_reb),
+                    "up_chg_end_p50_mV": up0 * 1e3,
+                    "up_1min_p50_mV": up_1min * 1e3,
+                    "up_5min_p50_mV": up_5min * 1e3,
+                    "up_30min_p50_mV": up_30min * 1e3,
+                    "charge_like": bool(charge_like),
+                    "discharge_like_fail": bool(discharge_like),
+                }
+                print(
+                    f"2h3_rebound  Up@切停={up0*1e3:+.2f} mV  "
+                    f"1/5/30min={up_1min*1e3:+.2f}/{up_5min*1e3:+.2f}/{up_30min*1e3:+.2f} mV  "
+                    f"charge_like={int(charge_like)} discharge_fail={int(discharge_like)}",
+                    flush=True,
+                )
+                if discharge_like:
+                    print("WARN 2H3 Up 切停后为正——像放电回弹，§3.6 可能没钉充电表", flush=True)
+                elif not charge_like:
+                    print("WARN 2H3 Up 回弹不像充电（应从负往 0）", flush=True)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -914,6 +1078,7 @@ def main() -> None:
         "slice_24h": slice_24h,
         "s_ah_pin": s_ah_pin,
         "u_p_end": up_end,
+        "rebound_2h3": rebound if str(meta.get("exp")) == "2h3" else None,
         "phi_dir": _rel(_resolve(args.phi_dir)) if do_ifx_demo else None,
         "demo_lr": args.demo_lr if do_ifx_demo else None,
         "demo_e_thr_mV": args.demo_e_thr * 1e3 if do_ifx_demo else None,
@@ -1030,8 +1195,12 @@ def main() -> None:
                 print("WARN 2H 包级门不应触发（靠 §3.5，不是 1 pp 门）")
             n_park = int(np.mean([r.get("n_skip_park", 0) for r in rows]))
             n_upd = int(np.mean([r.get("n_update", 0) for r in rows]))
-            if n_upd > 0:
+            if meta["exp"] in {"2h1", "2h2"} and n_upd > 0:
                 print(f"WARN 2H 主档不应写 k（mean upd={n_upd}）")
+            if meta["exp"] == "2h3" and n_upd > 30:
+                print(
+                    f"WARN 2H3 充段可写少量窗，但 mean upd={n_upd} 偏多（停放应 skip_park）"
+                )
             if n_park < 1:
                 print("WARN 2H 主档应走 n_skip_park（§3.5）")
             if summary.get("n_k0_in_1pm03", n) < n:
@@ -1039,7 +1208,8 @@ def main() -> None:
                     f"WARN 2H 主档 k 应保持 1（in_1±0.03="
                     f"{summary.get('n_k0_in_1pm03')}/{n}）"
                 )
-            if s_ah_pin and s_ah_pin["max_abs_drift_pp"] > 0.05:
+            # 2H1/2H2：全程钉住；2H3：安时在充段会动，只查停放段漂移在 gen 侧
+            if meta["exp"] in {"2h1", "2h2"} and s_ah_pin and s_ah_pin["max_abs_drift_pp"] > 0.05:
                 print(
                     f"WARN 2H s_ah 应钉在出发值（max|Δ|="
                     f"{s_ah_pin['max_abs_drift_pp']:.3f} pp）"

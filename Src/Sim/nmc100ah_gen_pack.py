@@ -14,6 +14,8 @@
     python Src/Sim/nmc100ah_gen_pack.py --exp 2g --n 8 --seed 209 --out-dir Data/pack/2g_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2h1 --n 8 --seed 210 --park-h 6 --out-dir Data/pack/2h1_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2h1 --n 180 --seed 210 --out-dir Data/pack/2h1
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2h3 --n 8 --seed 212 --park-h 1 --charge-min 5 --out-dir Data/pack/2h3_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2h3 --n 180 --seed 212 --out-dir Data/pack/2h3
 """
 from __future__ import annotations
 
@@ -69,6 +71,9 @@ I_AFE_A = 0.012
 I_AFE_TOP_EXTRA_A = 0.002
 PARK_H_DEFAULT = 48.0
 PARK_DT_S = 5.0  # PC 停放默认 5 s（可 --park-dt 1）；门控仍按秒验
+CHARGE_C_RATE = 1.0  # 2H3：1C 充再停（06-a §3.6 / §5.7）
+CHARGE_MIN_DEFAULT = 5.0
+I_EDGE_PIN_A = 20.0  # 钉上一档大电流：|I|≥20 A
 
 
 def module_layout(n: int) -> tuple[int, int]:
@@ -153,6 +158,98 @@ def simulate_afe_park(
     }
 
 
+def simulate_charge_afe_park(
+    cells: list[dict],
+    *,
+    i_afe: np.ndarray,
+    dt_s: float,
+    charge_s: float,
+    park_s: float,
+    t_c: float = 25.0,
+    capacity_ah: float = 100.0,
+    r_refresh_s: float = 60.0,
+) -> dict[str, np.ndarray]:
+    """1C 充数分钟 → AFE 停放。滚已有 Up 的 R/τ 钉上一档大电流（充电 1C），驱动项用 I_cell。
+
+    06-a §3.6：不要因现在 +12 mA 就切放电表。错误实现会把充电回弹拧成放电形状。
+    """
+    n = len(cells)
+    n_chg = max(2, int(round(float(charge_s) / float(dt_s))))
+    n_park = max(2, int(round(float(park_s) / float(dt_s))))
+    n_steps = n_chg + n_park
+    model = make_ecm(r0_scale=1.0, r1_scale=1.0, c1_scale=1.0)
+    soc = np.array([float(c["soc0"]) for c in cells], dtype=float)
+    u_p = np.zeros(n, dtype=float)
+    q_as = np.array([float(c.get("q_ah", capacity_ah)) * 3600.0 for c in cells], dtype=float)
+    i_afe = np.asarray(i_afe, dtype=float).reshape(n)
+    i_chg_pack = -float(CHARGE_C_RATE) * float(capacity_ah)  # 放电为正 → 充电为负
+    refresh = max(1, int(round(float(r_refresh_s) / float(dt_s))))
+
+    u_t = np.empty((n_steps, n), dtype=np.float32)
+    soc_out = np.empty((n_steps, n), dtype=np.float32)
+    u_ocv = np.empty((n_steps, n), dtype=np.float32)
+    u_p_out = np.empty((n_steps, n), dtype=np.float32)
+    t_true = np.full((n_steps, n), float(t_c), dtype=np.float32)
+    cutoff = np.zeros((n_steps, n), dtype=np.float32)
+    i_pack = np.empty(n_steps, dtype=np.float64)
+    i_cell = np.empty((n_steps, n), dtype=np.float32)
+    i_lookup = np.empty((n_steps, n), dtype=np.float32)
+
+    r0 = np.empty(n)
+    r1 = np.empty(n)
+    c1 = np.empty(n)
+    alpha = np.empty(n)
+    # 上一档 |I|≥20 A 的查表电流（符号保留）；很久没有大电流才退回 I_cell
+    i_pin = np.zeros(n, dtype=float)
+
+    for k in range(n_steps):
+        if k < n_chg:
+            i_p = i_chg_pack
+            i_c = i_p + i_afe  # I_cell = I_pack + I_AFE
+        else:
+            i_p = 0.0
+            i_c = i_afe.copy()
+        i_pack[k] = i_p
+        i_cell[k] = i_c
+
+        # 钉上一档大电流（§3.6）
+        big = np.abs(i_c) >= float(I_EDGE_PIN_A)
+        i_pin = np.where(big, i_c, i_pin)
+        # 若尚未有过大电流（不应发生在充后停），退回当前 I_cell
+        no_hist = np.abs(i_pin) < 1e-12
+        i_look = np.where(no_hist, i_c, i_pin)
+        i_lookup[k] = i_look
+
+        if k % refresh == 0 or k == n_chg:
+            for i in range(n):
+                a, b, c = model.evaluate(i_a=float(i_look[i]), t_celsius=t_c, soc=float(soc[i]))
+                r0[i], r1[i], c1[i] = float(a), float(b), float(c)
+            alpha = np.exp(-float(dt_s) / np.maximum(r1 * c1, 1e-12))
+
+        u_p = alpha * u_p + r1 * (1.0 - alpha) * i_c
+        # 欧姆仍用现电流；极化 R0 查表也钉 pin（与 τ 一致）
+        uocv = _ocv_vec(soc, t_c)
+        ut = uocv - i_c * r0 - u_p
+        soc = np.clip(soc - i_c * float(dt_s) / q_as, 0.0, 1.0)
+        u_t[k] = ut
+        soc_out[k] = soc
+        u_ocv[k] = uocv
+        u_p_out[k] = u_p
+
+    return {
+        "u_t_true": u_t,
+        "soc_true": soc_out,
+        "t_true": t_true,
+        "u_ocv": u_ocv,
+        "u_p": u_p_out.astype(np.float32),
+        "cutoff": cutoff,
+        "i_pack": i_pack.astype(np.float64),
+        "i_cell": i_cell,
+        "i_lookup": i_lookup.astype(np.float32),
+        "n_charge_steps": n_chg,
+        "n_park_steps": n_park,
+    }
+
 
 def assign_cells(
     exp: str,
@@ -200,7 +297,7 @@ def assign_cells(
         elif exp in {"2d1", "2d2"}:
             k = 1.0
             aged = False
-        elif exp in {"2h1", "2h2"}:
+        elif exp in {"2h1", "2h2", "2h3"}:
             # 06-a §5.7：k=1、b_I=0、化学 I_sd=0；AFE 另挂 I_cell
             k = 1.0
             aged = False
@@ -390,6 +487,7 @@ def generate_pack(
     write_csv_samples: bool = True,
     park_h: float | None = None,
     park_dt_s: float | None = None,
+    charge_min: float | None = None,
 ) -> Path:
     rel = str(out_dir.relative_to(REPO_ROOT)).replace("\\", "/") if out_dir.is_relative_to(REPO_ROOT) else str(out_dir)
     if rel.rstrip("/") in FORBIDDEN_OUT or any(rel.startswith(x + "/") for x in FORBIDDEN_OUT):
@@ -409,7 +507,7 @@ def generate_pack(
             cell["z_q"] = draw["z_q"]
             cell["channels"] = {"r0": draw["r0"], "r1": draw["r1"]}
 
-    if exp in {"2h1", "2h2"}:
+    if exp in {"2h1", "2h2", "2h3"}:
         if abs(b_i) > 1e-12:
             raise RuntimeError("2H 禁止叠 2B 的 5 A 零偏")
         if engine != "ecm":
@@ -417,8 +515,12 @@ def generate_pack(
         dt_s = float(PARK_DT_S if park_dt_s is None else park_dt_s)
         hours = float(PARK_H_DEFAULT if park_h is None else park_h)
         park_s = hours * 3600.0
+        chg_min = float(CHARGE_MIN_DEFAULT if charge_min is None else charge_min)
+        chg_s = chg_min * 60.0 if exp == "2h3" else 0.0
         n_mod, cpm = module_layout(n)
-        i_afe = np.array([afe_current_a(exp, i, n=n) for i in range(n)], dtype=float)
+        # 2H3 与 2H1 同均匀 AFE（顶芯不加）
+        afe_exp = "2h1" if exp == "2h3" else exp
+        i_afe = np.array([afe_current_a(afe_exp, i, n=n) for i in range(n)], dtype=float)
         for i, cell in enumerate(cells):
             cell["i_afe_a"] = float(i_afe[i])
             cell["module"] = int(i // cpm) if cpm else 0
@@ -426,7 +528,8 @@ def generate_pack(
         print(
             f"gen_pack exp={exp} n={n} engine={engine} seed={seed} b_I=0  "
             f"park={hours:g} h dt={dt_s:g}s  I_AFE={I_AFE_A*1e3:.0f} mA  "
-            f"modules={n_mod}x{cpm}",
+            f"modules={n_mod}x{cpm}"
+            + (f"  charge={chg_min:g} min@1C" if exp == "2h3" else ""),
             flush=True,
         )
         for i, cell in enumerate(cells):
@@ -435,11 +538,25 @@ def generate_pack(
                 f"I_afe={cell['i_afe_a']*1e3:.1f} mA  soc0={cell['soc0']:.3f}",
                 flush=True,
             )
-        sim = simulate_afe_park(cells, i_afe=i_afe, dt_s=dt_s, park_s=park_s, t_c=25.0)
-        n_steps = int(sim["u_t_true"].shape[0])
-        time_s = np.arange(n_steps, dtype=float) * dt_s
-        i_true = np.zeros(n_steps, dtype=float)  # 分流器 / 包电流
-        i_cell = np.repeat(i_afe.reshape(1, -1), n_steps, axis=0).astype(np.float32)
+        if exp == "2h3":
+            sim = simulate_charge_afe_park(
+                cells,
+                i_afe=i_afe,
+                dt_s=dt_s,
+                charge_s=chg_s,
+                park_s=park_s,
+                t_c=25.0,
+            )
+            n_steps = int(sim["u_t_true"].shape[0])
+            time_s = np.arange(n_steps, dtype=float) * dt_s
+            i_true = np.asarray(sim["i_pack"], dtype=float)
+            i_cell = np.asarray(sim["i_cell"], dtype=np.float32)
+        else:
+            sim = simulate_afe_park(cells, i_afe=i_afe, dt_s=dt_s, park_s=park_s, t_c=25.0)
+            n_steps = int(sim["u_t_true"].shape[0])
+            time_s = np.arange(n_steps, dtype=float) * dt_s
+            i_true = np.zeros(n_steps, dtype=float)  # 分流器 / 包电流
+            i_cell = np.repeat(i_afe.reshape(1, -1), n_steps, axis=0).astype(np.float32)
         cmd_id = np.zeros(n_steps, dtype=float)
         u_t_true = sim["u_t_true"]
         soc_true = sim["soc_true"]
@@ -452,8 +569,7 @@ def generate_pack(
         i_meas = i_true + np.array([_gauss(rng, NOISE_STD["current_a"]) for _ in range(n_steps)])
         u_t_meas = u_t_true + rng.normal(0.0, NOISE_STD["voltage_v"], size=u_t_true.shape).astype(np.float32)
         t_meas = t_true + rng.normal(0.0, NOISE_STD["temp_c"], size=t_true.shape).astype(np.float32)
-        np.savez_compressed(
-            out_dir / "pack.npz",
+        save_kw = dict(
             time_s=time_s,
             i_true=i_true,
             i_meas=i_meas,
@@ -468,7 +584,29 @@ def generate_pack(
             cutoff=cutoff,
             cmd_id=cmd_id,
         )
-        seq = [{"mode": "rest", "duration_s": float(park_s)}]
+        if exp == "2h3" and "i_lookup" in sim:
+            save_kw["i_lookup"] = np.asarray(sim["i_lookup"], dtype=np.float32)
+        np.savez_compressed(out_dir / "pack.npz", **save_kw)
+        if exp == "2h3":
+            seq = [
+                {"mode": "charge", "duration_s": float(chg_s), "c_rate": float(CHARGE_C_RATE)},
+                {"mode": "rest", "duration_s": float(park_s)},
+            ]
+            n_chg_steps = int(sim["n_charge_steps"])
+            wave = "charge_afe_park"
+            note = (
+                "2H3：1C 充数分钟再停；I_meas 充段≈−100 A、停放≈0；"
+                "I_cell=I_pack+I_AFE；滚 Up 的 R/τ 钉上一档充电大电流（§3.6）；"
+                "禁止把 12 mA 估进 hat b_I。"
+            )
+        else:
+            seq = [{"mode": "rest", "duration_s": float(park_s)}]
+            n_chg_steps = 0
+            wave = "afe_park"
+            note = (
+                "2H：I_meas≈0（分流器）；I_cell=I_AFE 串过模组进 ECM/SOC 真值；"
+                "禁止把 12 mA 估进 hat b_I。§3.5 无边沿不写 k。"
+            )
         meta = {
             "exp": exp,
             "n": n,
@@ -480,12 +618,15 @@ def generate_pack(
             "seed": seed,
             "k_aged": k_aged,
             "channel_sigma": None,
-            "wave": "afe_park",
+            "wave": wave,
             "park_h": hours,
+            "charge_min": float(chg_min) if exp == "2h3" else 0.0,
+            "n_charge_steps": int(n_chg_steps),
             "i_afe_a": float(I_AFE_A),
             "i_afe_top_extra_a": float(I_AFE_TOP_EXTRA_A) if exp == "2h2" else 0.0,
             "n_modules": n_mod,
             "cells_per_module": cpm,
+            # 2H3 不按趟拆门：整段一趟，停放靠 §3.5 skip_park（拆趟会让短停放被 slope 误闩）
             "trips": [0],
             "n_trips": 1,
             "sequence": seq,
@@ -495,10 +636,7 @@ def generate_pack(
             "capacity_ah_true": 100.0,
             "capacity_scale": 1.0,
             "suggested_win": max(2, int(round(10.0 / dt_s))),
-            "note": (
-                "2H：I_meas≈0（分流器）；I_cell=I_AFE 串过模组进 ECM/SOC 真值；"
-                "禁止把 12 mA 估进 hat b_I。§3.5 无边沿不写 k。"
-            ),
+            "note": note,
         }
         (out_dir / "pack.json").write_text(
             json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -511,12 +649,16 @@ def generate_pack(
                 tops = [c["id"] for c in cells if c.get("module_top")]
                 if tops:
                     sample_ids.append(tops[0])
+            mode_arr = np.array(["afe_park"] * n_steps, dtype=object)
+            if exp == "2h3":
+                mode_arr[: int(n_chg_steps)] = "charge"
+                mode_arr[int(n_chg_steps) :] = "afe_park"
             for cid in dict.fromkeys(sample_ids):
                 data = {
                     "time_s": time_s,
                     "step": np.arange(n_steps, dtype=float),
                     "cmd_id": cmd_id,
-                    "mode": np.array(["afe_park"] * n_steps, dtype=object),
+                    "mode": mode_arr,
                     "cutoff": cutoff[:, cid],
                     "i_true_a": np.asarray(i_cell[:, cid], dtype=float),
                     "i_meas_a": i_meas,
@@ -737,7 +879,7 @@ def main() -> None:
     p.add_argument(
         "--exp",
         default="2a1",
-        choices=["2a1", "2a2", "2a3", "2a4", "2b", "2c", "2e", "2d1", "2d2", "2g", "2h1", "2h2"],
+        choices=["2a1", "2a2", "2a3", "2a4", "2b", "2c", "2e", "2d1", "2d2", "2g", "2h1", "2h2", "2h3"],
     )
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--engine", default="pybamm", choices=["ecm", "pybamm"])
@@ -746,6 +888,7 @@ def main() -> None:
     p.add_argument("--k-aged", type=float, default=1.15)
     p.add_argument("--park-h", type=float, default=None, help="2H 停放小时；默认 48，烟测 6")
     p.add_argument("--park-dt", type=float, default=None, help="2H 采样秒；默认 5（门控仍按秒）")
+    p.add_argument("--charge-min", type=float, default=None, help="2H3 充电分钟；默认 5")
     args = p.parse_args()
     if args.exp in {"2a3", "2a4"} and args.engine == "pybamm":
         print(f"{args.exp} 真值是每芯通道 / Q_i，改用 --engine ecm", flush=True)
@@ -765,7 +908,7 @@ def main() -> None:
     if args.exp in {"2d1", "2d2"} and args.engine == "pybamm":
         print(f"{args.exp} 滤波层对照对齐 04-a E，改用 --engine ecm（BOL 真值，表偏在估计器）", flush=True)
         args.engine = "ecm"
-    if args.exp in {"2h1", "2h2"} and args.engine == "pybamm":
+    if args.exp in {"2h1", "2h2", "2h3"} and args.engine == "pybamm":
         print(f"{args.exp} AFE 停放对齐 06-a §5.7，改用 --engine ecm（不叠 SPM / 2B）", flush=True)
         args.engine = "ecm"
     seed = args.seed
@@ -783,6 +926,7 @@ def main() -> None:
             "2d2": 207,
             "2h1": 210,
             "2h2": 211,
+            "2h3": 212,
         }.get(args.exp, 201)
     out = args.out_dir or f"Data/pack/{args.exp}" + ("" if args.n >= 180 else f"_n{args.n}")
     generate_pack(
@@ -794,6 +938,7 @@ def main() -> None:
         k_aged=args.k_aged,
         park_h=args.park_h,
         park_dt_s=args.park_dt,
+        charge_min=args.charge_min,
     )
 
 
