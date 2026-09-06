@@ -80,6 +80,18 @@ def load_pack(pack_dir: Path) -> tuple[dict, dict[str, np.ndarray]]:
         raise RuntimeError("2e 必须 b_I=0")
     if exp.startswith("2d") and abs(b_i) > 1e-6:
         raise RuntimeError(f"{exp} 必须 b_I=0")
+    if exp in {"2h1", "2h2"}:
+        if abs(b_i) > 1e-6:
+            raise RuntimeError(f"{exp} 必须 b_I=0（不要叠 2B）")
+        if "i_cell" not in data:
+            raise RuntimeError(f"{exp} pack.npz 缺 i_cell（AFE 真电流）")
+        # 分流器测量不得偷带 AFE
+        i_m = abs(float(np.median(np.asarray(data["i_meas"], dtype=float))))
+        i_c = float(np.median(np.asarray(data["i_cell"], dtype=float)))
+        if i_m > 0.05:
+            raise RuntimeError(f"{exp} I_meas 中位 {i_m:.4f} A，停放应≈0")
+        if i_c < 0.005:
+            raise RuntimeError(f"{exp} I_cell 中位 {i_c:.4f} A，应有 ~12 mA AFE")
     return meta, data
 
 
@@ -217,6 +229,7 @@ def run_cell_kgrid(
     trips: list[int] | None = None,
     k_after_trips: int = 1,
     trip_blocked: list[bool] | None = None,
+    disable_park_gate: bool = False,
 ) -> dict:
     win = int(args.win)
     dt_s = cfg.dt_s
@@ -232,6 +245,33 @@ def run_cell_kgrid(
     i_np_all = seq["i"]
     trip_starts = [int(x) for x in (trips or [0])]
     hold_until = max(int(k_after_trips) - 1, 0)
+    # 2H 快路径：全程无边沿 + 主档停放门 → 全部 park skip，不必逐步 SGD
+    if (
+        not disable_park_gate
+        and not nogate
+        and not pack_blocked
+        and float(np.max(np.abs(i_np_all))) < float(args.rest_eps)
+    ):
+        n_win = max(1, (n + win - 1) // win)
+        # 末窗太短时与主循环一致少计
+        if n - (n_win - 1) * win < max(win // 4, 20) and n_win > 1:
+            n_win -= 1
+        n_skip_park = n_win
+        k_ref = model.k_at(0.50, 25.0)
+        k_mean = model.k_at(float(seq["soc"].mean()), float(seq["t"].mean()))
+        return {
+            "n_win": n_win,
+            "n_update": 0,
+            "n_skip_gate": 0,
+            "n_skip_pack": 0,
+            "n_skip_park": n_skip_park,
+            "n_skip_trip": 0,
+            "k_at_ref": list(k_ref),
+            "k_at_mean": list(k_mean),
+            "k_tables": model.k_tables(),
+            "hit0": hit0.tolist(),
+            "hit1": hit1.tolist(),
+        }
     for start in range(0, n, win):
         end = min(start + win, n)
         if end - start < max(win // 4, 20):
@@ -264,7 +304,7 @@ def run_cell_kgrid(
             n_skip_trip += 1
             u_p0 = _roll_up(model, sl, u_p0, dt_s, len(i_np) // 2)
             continue
-        if not pol["write_k"]:
+        if (not disable_park_gate) and (not pol["write_k"]):
             n_skip_park += 1
             u_p0 = _roll_up(model, sl, u_p0, dt_s, len(i_np) // 2)
             continue
@@ -565,6 +605,11 @@ def main() -> None:
         default=1,
         help="第 N 趟才写 k（2D 主档 3；1 是把这一趟升级成老化的失败对照）",
     )
+    p.add_argument(
+        "--disable-park-gate",
+        action="store_true",
+        help="关掉 §3.5 无边沿停放门（2H 失败对照：只留 ≥3 s 静置门）",
+    )
     args = p.parse_args()
     set_seed(args.seed)
 
@@ -591,10 +636,15 @@ def main() -> None:
     hat_q = float(meta.get("hat_q_ah", q_true * cap_scale))
     if str(meta.get("exp")) == "2g" and abs(cap_scale - 0.95) > 1e-3:
         raise RuntimeError(f"2g 需要 capacity_scale=0.95（现在 {cap_scale:g}）")
+    dt_pack = float(meta.get("dt_s", 0.1))
+    if "suggested_win" in meta and int(args.win) == 100 and abs(dt_pack - 0.1) > 1e-9:
+        args.win = int(meta["suggested_win"])
+        print(f"win←pack.json suggested_win={args.win}（保持 ~10 s 墙钟）", flush=True)
     print(
         f"pack {meta['exp']} n={n} engine={meta.get('engine')} b_I={meta.get('b_I')}  "
         f"mode={args.mode} mlp={mlp_dir}  r0_scale={args.r0_scale:g} dr0={int(args.dr0)}  "
-        f"k_after_trips={args.k_after_trips}  "
+        f"k_after_trips={args.k_after_trips}  disable_park={int(args.disable_park_gate)}  "
+        f"dt={dt_pack:g}s win={args.win}  "
         f"Q={q_true:g}Ah hatQ={hat_q:g}Ah scale={cap_scale:g}",
         flush=True,
     )
@@ -605,11 +655,14 @@ def main() -> None:
     for par in base.parameters():
         par.requires_grad_(False)
     base = base.to(device).eval()
+    # 停放 1 s 采样：EKF / 滑窗离散必须跟 pack dt，不能死钉训练网格的 0.1 s
+    cfg.dt_s = dt_pack
     provider = MlpParamProvider(base, scaler, device=device, r0_scale=args.r0_scale)
     # 对齐 KF/run.py：capacity_ah * capacity_scale 进 EKF/Ah 分母
     kf_cfg = KfConfig(
         estimate_dr0=bool(args.dr0),
         capacity_ah=q_true * cap_scale,
+        dt_s=dt_pack,
     )
 
     ocv_fn, docv_fn = ocv_nmc, docv_ds
@@ -709,6 +762,7 @@ def main() -> None:
                 trips=trips,
                 k_after_trips=int(args.k_after_trips),
                 trip_blocked=trip_blocked,
+                disable_park_gate=bool(args.disable_park_gate),
             )
             row.update(kg)
             rmse1 = overall_rmse(model, [seq_true], scaler, cfg, device)
@@ -717,7 +771,8 @@ def main() -> None:
                 f"  kgrid {i:03d} aged={int(cell['aged'])}  "
                 f"k_ref=({kg['k_at_ref'][0]:.3f},{kg['k_at_ref'][1]:.3f})  "
                 f"upd={kg['n_update']}/{kg['n_win']}  "
-                f"skip_pack={kg['n_skip_pack']} skip_trip={kg['n_skip_trip']}  "
+                f"skip_pack={kg['n_skip_pack']} skip_park={kg['n_skip_park']}  "
+                f"skip_trip={kg['n_skip_trip']}  "
                 f"rmse {rmse0*1e3:.2f}→{rmse1*1e3:.2f} mV",
                 flush=True,
             )
@@ -763,7 +818,7 @@ def main() -> None:
     se = np.array([r["s_end_post_err_pp"] for r in rows], dtype=float)
     summary["d_r0_p50_uOhm"] = float(np.percentile(dr_end, 50))
     summary["d_r0_mean_uOhm"] = float(np.median(dr_m))
-    summary["d_r0_i_p50_uOhm"] = float(np.nanmedian(dr_i))
+    summary["d_r0_i_p50_uOhm"] = float(np.nanmedian(dr_i)) if np.any(np.isfinite(dr_i)) else float("nan")
     summary["s_post_err_p50_pp"] = float(np.median(se))
     if str(meta["exp"]) == "2c" and do_k:
         aged_rows = [r for r, c in zip(rows, cells) if c["aged"] and "k_tables" in r]
@@ -776,6 +831,56 @@ def main() -> None:
 
         summary["k0_s010_t30_aged"] = _node_k0(aged_rows)
         summary["k0_s010_t30_nom"] = _node_k0(nom_rows)
+    # 2H：24 h 切片、s_ah 钉住、Up 终值
+    slice_24h = None
+    s_ah_pin = None
+    up_end = None
+    if str(meta.get("exp", "")).startswith("2h"):
+        idx24 = int(round(24.0 * 3600.0 / dt_pack))
+        if ds_mat.shape[0] > idx24:
+            g24 = pack_gate(ds_mat[: idx24 + 1], dt_s=dt_pack)
+            slice_24h = {
+                "index": idx24,
+                "hours": 24.0,
+                "m_pp": float(g24["m"] * 1e2),
+                "f_same": float(g24["f_same"]),
+                "slope_pph": float(g24.get("slope_pph", float("nan"))),
+                "blocked": bool(g24["blocked"]),
+                "reason": g24["reason"],
+                "ds_p50_pp": float(np.median(ds_mat[idx24]) * 1e2),
+                "ds_p05_pp": float(np.percentile(ds_mat[idx24], 5) * 1e2),
+                "ds_p95_pp": float(np.percentile(ds_mat[idx24], 95) * 1e2),
+            }
+            print(
+                f"slice_24h  m={slice_24h['m_pp']:+.3f} pp  blocked={slice_24h['blocked']}  "
+                f"ds_p50={slice_24h['ds_p50_pp']:+.3f} pp",
+                flush=True,
+            )
+        s0 = np.array([float(c["soc0"]) for c in cells], dtype=float)
+        s_ah_end = np.array([float(logs[i]["soc_ah"][-1]) for i in range(n)], dtype=float)
+        s_ah_pin = {
+            "s0_p50": float(np.median(s0)),
+            "s_ah_end_p50": float(np.median(s_ah_end)),
+            "max_abs_drift_pp": float(np.max(np.abs(s_ah_end - s0)) * 1e2),
+        }
+        print(
+            f"s_ah_pin  max|Δ|={s_ah_pin['max_abs_drift_pp']:.4f} pp  "
+            f"(应≈0，禁止把 12 mA 估进 hat b_I)",
+            flush=True,
+        )
+        if "u_p" in data:
+            up_last = np.asarray(data["u_p"][-1], dtype=float)
+            up_end = {
+                "p50_uV": float(np.median(up_last) * 1e6),
+                "p05_uV": float(np.percentile(up_last, 5) * 1e6),
+                "p95_uV": float(np.percentile(up_last, 95) * 1e6),
+                "mean_uV": float(np.mean(up_last) * 1e6),
+            }
+            print(
+                f"u_p_end  p50={up_end['p50_uV']:.2f} µV（久置稳态 ~I·R1，不是 0）",
+                flush=True,
+            )
+
     out_dir.mkdir(parents=True, exist_ok=True)
     report = {
         "mode": args.mode,
@@ -804,6 +909,11 @@ def main() -> None:
         "summary": summary,
         "win": args.win,
         "lr": args.lr,
+        "dt_s": dt_pack,
+        "disable_park_gate": bool(args.disable_park_gate),
+        "slice_24h": slice_24h,
+        "s_ah_pin": s_ah_pin,
+        "u_p_end": up_end,
         "phi_dir": _rel(_resolve(args.phi_dir)) if do_ifx_demo else None,
         "demo_lr": args.demo_lr if do_ifx_demo else None,
         "demo_e_thr_mV": args.demo_e_thr * 1e3 if do_ifx_demo else None,
@@ -914,6 +1024,28 @@ def main() -> None:
                     f"WARN 2B ifx_demo 应全包同号大改 k（up/dn="
                     f"{summary.get('n_k0_up')}/{summary.get('n_k0_dn')}）"
                 )
+    if str(meta["exp"]).startswith("2h"):
+        if do_k and not nogate and not args.disable_park_gate:
+            if gate["blocked"]:
+                print("WARN 2H 包级门不应触发（靠 §3.5，不是 1 pp 门）")
+            n_park = int(np.mean([r.get("n_skip_park", 0) for r in rows]))
+            n_upd = int(np.mean([r.get("n_update", 0) for r in rows]))
+            if n_upd > 0:
+                print(f"WARN 2H 主档不应写 k（mean upd={n_upd}）")
+            if n_park < 1:
+                print("WARN 2H 主档应走 n_skip_park（§3.5）")
+            if summary.get("n_k0_in_1pm03", n) < n:
+                print(
+                    f"WARN 2H 主档 k 应保持 1（in_1±0.03="
+                    f"{summary.get('n_k0_in_1pm03')}/{n}）"
+                )
+            if s_ah_pin and s_ah_pin["max_abs_drift_pp"] > 0.05:
+                print(
+                    f"WARN 2H s_ah 应钉在出发值（max|Δ|="
+                    f"{s_ah_pin['max_abs_drift_pp']:.3f} pp）"
+                )
+        if do_k and args.disable_park_gate:
+            print("NOTE 2H 无 §3.5：预期全包 k1 同号爬（失败对照）")
     if meta["exp"] == "2g":
         if abs(cap_scale - 0.95) > 1e-3:
             print(f"WARN 2G capacity_scale 应为 0.95（现在 {cap_scale:g}）")

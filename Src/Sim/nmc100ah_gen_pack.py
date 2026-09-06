@@ -12,6 +12,8 @@
     python Src/Sim/nmc100ah_gen_pack.py --exp 2d1 --n 8 --seed 207 --out-dir Data/pack/2d1_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2d2 --n 8 --seed 207 --out-dir Data/pack/2d2_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2g --n 8 --seed 209 --out-dir Data/pack/2g_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2h1 --n 8 --seed 210 --park-h 6 --out-dir Data/pack/2h1_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2h1 --n 180 --seed 210 --out-dir Data/pack/2h1
 """
 from __future__ import annotations
 
@@ -62,6 +64,96 @@ def n_aged_of(n: int) -> int:
     return int(round(n * 20 / 180)) or 1
 
 
+# 2H：BQ79718 模组切法（06-a §5.7）。正式 10×18；烟测可用 4×2。
+I_AFE_A = 0.012
+I_AFE_TOP_EXTRA_A = 0.002
+PARK_H_DEFAULT = 48.0
+PARK_DT_S = 5.0  # PC 停放默认 5 s（可 --park-dt 1）；门控仍按秒验
+
+
+def module_layout(n: int) -> tuple[int, int]:
+    if n >= 180:
+        return 10, 18
+    if n % 2 == 0 and n >= 4:
+        return n // 2, 2
+    return 1, n
+
+
+def afe_current_a(exp: str, cell_id: int, *, n: int) -> float:
+    i = float(I_AFE_A)
+    if exp == "2h2":
+        n_mod, cpm = module_layout(n)
+        # 每模组顶芯（模组内最后一只）再 +2 mA
+        if cpm > 0 and (cell_id % cpm) == (cpm - 1) and cell_id // cpm < n_mod:
+            i += float(I_AFE_TOP_EXTRA_A)
+    return i
+
+
+def _ocv_vec(soc: np.ndarray, t_celsius: float) -> np.ndarray:
+    # 与 nmc100ah_gen.ocv_nmc / KF.ocv 同一张表；向量化给停放批仿真用
+    from nmc100ah_gen import _OCV_SOC, _OCV_V, _OCV_DUDT
+
+    s = np.clip(np.asarray(soc, dtype=float), 0.0, 1.0)
+    return np.interp(s, _OCV_SOC, _OCV_V) + _OCV_DUDT * (float(t_celsius) - 25.0)
+
+
+def simulate_afe_park(
+    cells: list[dict],
+    *,
+    i_afe: np.ndarray,
+    dt_s: float,
+    park_s: float,
+    t_c: float = 25.0,
+    r_refresh_s: float = 60.0,
+) -> dict[str, np.ndarray]:
+    """I_cell=I_AFE 常数停放；ECM 吃 I_cell。R 按分钟刷新（SOC 只掉 <1 pp）。"""
+    n = len(cells)
+    n_steps = int(round(float(park_s) / float(dt_s)))
+    if n_steps < 2:
+        raise ValueError("park 太短")
+    model = make_ecm(r0_scale=1.0, r1_scale=1.0, c1_scale=1.0)
+    soc = np.array([float(c["soc0"]) for c in cells], dtype=float)
+    u_p = np.zeros(n, dtype=float)
+    q_as = np.array([float(c.get("q_ah", 100.0)) * 3600.0 for c in cells], dtype=float)
+    i_afe = np.asarray(i_afe, dtype=float).reshape(n)
+    refresh = max(1, int(round(float(r_refresh_s) / float(dt_s))))
+
+    u_t = np.empty((n_steps, n), dtype=np.float32)
+    soc_out = np.empty((n_steps, n), dtype=np.float32)
+    u_ocv = np.empty((n_steps, n), dtype=np.float32)
+    u_p_out = np.empty((n_steps, n), dtype=np.float32)
+    t_true = np.full((n_steps, n), float(t_c), dtype=np.float32)
+    cutoff = np.zeros((n_steps, n), dtype=np.float32)
+    r0 = np.empty(n)
+    r1 = np.empty(n)
+    c1 = np.empty(n)
+    alpha = np.empty(n)
+
+    for k in range(n_steps):
+        if k % refresh == 0:
+            for i in range(n):
+                a, b, c = model.evaluate(i_a=float(i_afe[i]), t_celsius=t_c, soc=float(soc[i]))
+                r0[i], r1[i], c1[i] = float(a), float(b), float(c)
+            alpha = np.exp(-float(dt_s) / np.maximum(r1 * c1, 1e-12))
+        u_p = alpha * u_p + r1 * (1.0 - alpha) * i_afe
+        uocv = _ocv_vec(soc, t_c)
+        ut = uocv - i_afe * r0 - u_p
+        soc = np.clip(soc - i_afe * float(dt_s) / q_as, 0.0, 1.0)
+        u_t[k] = ut
+        soc_out[k] = soc
+        u_ocv[k] = uocv
+        u_p_out[k] = u_p
+    return {
+        "u_t_true": u_t,
+        "soc_true": soc_out,
+        "t_true": t_true,
+        "u_ocv": u_ocv,
+        "u_p": u_p_out.astype(np.float32),
+        "cutoff": cutoff,
+    }
+
+
+
 def assign_cells(
     exp: str,
     n: int,
@@ -106,6 +198,10 @@ def assign_cells(
             k = k_aged
             aged = True
         elif exp in {"2d1", "2d2"}:
+            k = 1.0
+            aged = False
+        elif exp in {"2h1", "2h2"}:
+            # 06-a §5.7：k=1、b_I=0、化学 I_sd=0；AFE 另挂 I_cell
             k = 1.0
             aged = False
         else:
@@ -292,6 +388,8 @@ def generate_pack(
     seed: int,
     k_aged: float = 1.15,
     write_csv_samples: bool = True,
+    park_h: float | None = None,
+    park_dt_s: float | None = None,
 ) -> Path:
     rel = str(out_dir.relative_to(REPO_ROOT)).replace("\\", "/") if out_dir.is_relative_to(REPO_ROOT) else str(out_dir)
     if rel.rstrip("/") in FORBIDDEN_OUT or any(rel.startswith(x + "/") for x in FORBIDDEN_OUT):
@@ -310,6 +408,153 @@ def generate_pack(
             cell["q_ratio"] = draw["q_ratio"]
             cell["z_q"] = draw["z_q"]
             cell["channels"] = {"r0": draw["r0"], "r1": draw["r1"]}
+
+    if exp in {"2h1", "2h2"}:
+        if abs(b_i) > 1e-12:
+            raise RuntimeError("2H 禁止叠 2B 的 5 A 零偏")
+        if engine != "ecm":
+            raise RuntimeError("2H 强制 --engine ecm")
+        dt_s = float(PARK_DT_S if park_dt_s is None else park_dt_s)
+        hours = float(PARK_H_DEFAULT if park_h is None else park_h)
+        park_s = hours * 3600.0
+        n_mod, cpm = module_layout(n)
+        i_afe = np.array([afe_current_a(exp, i, n=n) for i in range(n)], dtype=float)
+        for i, cell in enumerate(cells):
+            cell["i_afe_a"] = float(i_afe[i])
+            cell["module"] = int(i // cpm) if cpm else 0
+            cell["module_top"] = bool(cpm and (i % cpm) == (cpm - 1))
+        print(
+            f"gen_pack exp={exp} n={n} engine={engine} seed={seed} b_I=0  "
+            f"park={hours:g} h dt={dt_s:g}s  I_AFE={I_AFE_A*1e3:.0f} mA  "
+            f"modules={n_mod}x{cpm}",
+            flush=True,
+        )
+        for i, cell in enumerate(cells):
+            print(
+                f"  cell {i:03d}/{n}  mod={cell['module']} top={int(cell['module_top'])}  "
+                f"I_afe={cell['i_afe_a']*1e3:.1f} mA  soc0={cell['soc0']:.3f}",
+                flush=True,
+            )
+        sim = simulate_afe_park(cells, i_afe=i_afe, dt_s=dt_s, park_s=park_s, t_c=25.0)
+        n_steps = int(sim["u_t_true"].shape[0])
+        time_s = np.arange(n_steps, dtype=float) * dt_s
+        i_true = np.zeros(n_steps, dtype=float)  # 分流器 / 包电流
+        i_cell = np.repeat(i_afe.reshape(1, -1), n_steps, axis=0).astype(np.float32)
+        cmd_id = np.zeros(n_steps, dtype=float)
+        u_t_true = sim["u_t_true"]
+        soc_true = sim["soc_true"]
+        t_true = sim["t_true"]
+        u_ocv = sim["u_ocv"]
+        u_p = sim["u_p"]
+        cutoff = sim["cutoff"]
+        rng = np.random.default_rng(seed + 1)
+        # I_meas = I_pack + 噪声；禁止把 12 mA 加进 I_meas
+        i_meas = i_true + np.array([_gauss(rng, NOISE_STD["current_a"]) for _ in range(n_steps)])
+        u_t_meas = u_t_true + rng.normal(0.0, NOISE_STD["voltage_v"], size=u_t_true.shape).astype(np.float32)
+        t_meas = t_true + rng.normal(0.0, NOISE_STD["temp_c"], size=t_true.shape).astype(np.float32)
+        np.savez_compressed(
+            out_dir / "pack.npz",
+            time_s=time_s,
+            i_true=i_true,
+            i_meas=i_meas,
+            i_cell=i_cell,
+            u_t_true=u_t_true,
+            u_t_meas=u_t_meas,
+            t_true=t_true,
+            t_meas=t_meas,
+            soc_true=soc_true,
+            u_ocv=u_ocv,
+            u_p=u_p,
+            cutoff=cutoff,
+            cmd_id=cmd_id,
+        )
+        seq = [{"mode": "rest", "duration_s": float(park_s)}]
+        meta = {
+            "exp": exp,
+            "n": n,
+            "n_aged": 0,
+            "engine": engine,
+            "dt_s": dt_s,
+            "n_steps": n_steps,
+            "b_I": 0.0,
+            "seed": seed,
+            "k_aged": k_aged,
+            "channel_sigma": None,
+            "wave": "afe_park",
+            "park_h": hours,
+            "i_afe_a": float(I_AFE_A),
+            "i_afe_top_extra_a": float(I_AFE_TOP_EXTRA_A) if exp == "2h2" else 0.0,
+            "n_modules": n_mod,
+            "cells_per_module": cpm,
+            "trips": [0],
+            "n_trips": 1,
+            "sequence": seq,
+            "cells": cells,
+            "noise_std": dict(NOISE_STD),
+            "hat_q_ah": 100.0,
+            "capacity_ah_true": 100.0,
+            "capacity_scale": 1.0,
+            "suggested_win": max(2, int(round(10.0 / dt_s))),
+            "note": (
+                "2H：I_meas≈0（分流器）；I_cell=I_AFE 串过模组进 ECM/SOC 真值；"
+                "禁止把 12 mA 估进 hat b_I。§3.5 无边沿不写 k。"
+            ),
+        }
+        (out_dir / "pack.json").write_text(
+            json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        if write_csv_samples:
+            from nmc100ah_gen import write_csv
+
+            sample_ids = [0]
+            if exp == "2h2":
+                tops = [c["id"] for c in cells if c.get("module_top")]
+                if tops:
+                    sample_ids.append(tops[0])
+            for cid in dict.fromkeys(sample_ids):
+                data = {
+                    "time_s": time_s,
+                    "step": np.arange(n_steps, dtype=float),
+                    "cmd_id": cmd_id,
+                    "mode": np.array(["afe_park"] * n_steps, dtype=object),
+                    "cutoff": cutoff[:, cid],
+                    "i_true_a": np.asarray(i_cell[:, cid], dtype=float),
+                    "i_meas_a": i_meas,
+                    "t_true_c": t_true[:, cid],
+                    "t_meas_c": t_meas[:, cid],
+                    "soc_true": soc_true[:, cid],
+                    "soc_meas": soc_true[:, cid],
+                    "u_ocv_v": u_ocv[:, cid],
+                    "r0_ohm": np.full(n_steps, np.nan),
+                    "r1_ohm": np.full(n_steps, np.nan),
+                    "c1_f": np.full(n_steps, np.nan),
+                    "tau1_s": np.full(n_steps, np.nan),
+                    "u_p_v": u_p[:, cid],
+                    "u_t_true_v": u_t_true[:, cid],
+                    "u_t_meas_v": u_t_meas[:, cid],
+                }
+                write_csv(
+                    out_dir / f"cell_{cid:03d}.csv",
+                    data,
+                    dt_s=dt_s,
+                    soc0=cells[cid]["soc0"],
+                    noise_enable=True,
+                    noise_seed=seed,
+                    noise_std=dict(NOISE_STD),
+                    sequence=seq,
+                    extra_meta=[
+                        f"# pack_exp={exp}",
+                        f"# engine={engine}",
+                        f"# cell={cid}",
+                        f"# i_afe_a={cells[cid]['i_afe_a']}",
+                        f"# i_meas_is_pack=1",
+                        f"# b_I=0",
+                    ],
+                    source="nmc100ah_gen_pack",
+                )
+        print(f"已写出 {out_dir / 'pack.npz'}", flush=True)
+        return out_dir
+
     dt_s = DT_S
     trip_starts = [0]
     if exp in {"2b", "2g"}:
@@ -492,13 +737,15 @@ def main() -> None:
     p.add_argument(
         "--exp",
         default="2a1",
-        choices=["2a1", "2a2", "2a3", "2a4", "2b", "2c", "2e", "2d1", "2d2", "2g"],
+        choices=["2a1", "2a2", "2a3", "2a4", "2b", "2c", "2e", "2d1", "2d2", "2g", "2h1", "2h2"],
     )
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--engine", default="pybamm", choices=["ecm", "pybamm"])
     p.add_argument("--out-dir", default=None)
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--k-aged", type=float, default=1.15)
+    p.add_argument("--park-h", type=float, default=None, help="2H 停放小时；默认 48，烟测 6")
+    p.add_argument("--park-dt", type=float, default=None, help="2H 采样秒；默认 5（门控仍按秒）")
     args = p.parse_args()
     if args.exp in {"2a3", "2a4"} and args.engine == "pybamm":
         print(f"{args.exp} 真值是每芯通道 / Q_i，改用 --engine ecm", flush=True)
@@ -518,6 +765,9 @@ def main() -> None:
     if args.exp in {"2d1", "2d2"} and args.engine == "pybamm":
         print(f"{args.exp} 滤波层对照对齐 04-a E，改用 --engine ecm（BOL 真值，表偏在估计器）", flush=True)
         args.engine = "ecm"
+    if args.exp in {"2h1", "2h2"} and args.engine == "pybamm":
+        print(f"{args.exp} AFE 停放对齐 06-a §5.7，改用 --engine ecm（不叠 SPM / 2B）", flush=True)
+        args.engine = "ecm"
     seed = args.seed
     if seed is None:
         seed = {
@@ -531,6 +781,8 @@ def main() -> None:
             "2e": 206,
             "2d1": 207,
             "2d2": 207,
+            "2h1": 210,
+            "2h2": 211,
         }.get(args.exp, 201)
     out = args.out_dir or f"Data/pack/{args.exp}" + ("" if args.n >= 180 else f"_n{args.n}")
     generate_pack(
@@ -540,6 +792,8 @@ def main() -> None:
         out_dir=_resolve(out),
         seed=int(seed),
         k_aged=args.k_aged,
+        park_h=args.park_h,
+        park_dt_s=args.park_dt,
     )
 
 
