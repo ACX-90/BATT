@@ -11,6 +11,7 @@
     python Src/Sim/nmc100ah_gen_pack.py --exp 2e --n 8 --seed 206 --out-dir Data/pack/2e_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2d1 --n 8 --seed 207 --out-dir Data/pack/2d1_n8
     python Src/Sim/nmc100ah_gen_pack.py --exp 2d2 --n 8 --seed 207 --out-dir Data/pack/2d2_n8
+    python Src/Sim/nmc100ah_gen_pack.py --exp 2g --n 8 --seed 209 --out-dir Data/pack/2g_n8
 """
 from __future__ import annotations
 
@@ -93,6 +94,10 @@ def assign_cells(
             k = 1.0
             aged = False
         elif exp == "2b":
+            k = 1.0
+            aged = False
+        elif exp == "2g":
+            # 06-a §5.6：全包 hatQ 错；k=1、b_I=0、Qi≡100（不开 --tol）
             k = 1.0
             aged = False
         elif exp == "2c":
@@ -307,7 +312,7 @@ def generate_pack(
             cell["channels"] = {"r0": draw["r0"], "r1": draw["r1"]}
     dt_s = DT_S
     trip_starts = [0]
-    if exp == "2b":
+    if exp in {"2b", "2g"}:
         seq = list(SEQ_CC_REST)
     elif exp == "2c":
         # 06-a §2.4 / §5.3：cc_rest 后再接 SEQUENCE 的 1C 放电 + 回弹。
@@ -408,7 +413,7 @@ def generate_pack(
         ),
         "wave": (
             "cc_rest"
-            if exp == "2b"
+            if exp in {"2b", "2g"}
             else ("cc_rest_pulse" if exp == "2c" else ("sequence_x3" if exp == "2d2" else "sequence"))
         ),
         "trips": trip_starts,
@@ -418,6 +423,15 @@ def generate_pack(
         "noise_std": dict(NOISE_STD),
         "note": "共享 I_true / I_meas（零偏一个数）；电压按芯。估计器只看见 I_meas。",
     }
+    if exp == "2g":
+        # BMS 规格书分母错：CSV / 真值 Qi 仍 100 Ah；EKF/Ah 用 hatQ=95 Ah。
+        meta["capacity_ah_true"] = 100.0
+        meta["hat_q_ah"] = 95.0
+        meta["capacity_scale"] = 0.95
+        meta["note"] = (
+            "共享 I_true / I_meas；电压按芯。2G：真值 Qi≡100 Ah，BMS hatQ=95 Ah "
+            "(capacity_scale=0.95)；b_I=0，不开 --tol。"
+        )
     (out_dir / "pack.json").write_text(
         json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -478,7 +492,7 @@ def main() -> None:
     p.add_argument(
         "--exp",
         default="2a1",
-        choices=["2a1", "2a2", "2a3", "2a4", "2b", "2c", "2e", "2d1", "2d2"],
+        choices=["2a1", "2a2", "2a3", "2a4", "2b", "2c", "2e", "2d1", "2d2", "2g"],
     )
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--engine", default="pybamm", choices=["ecm", "pybamm"])
@@ -491,6 +505,9 @@ def main() -> None:
         args.engine = "ecm"
     if args.exp == "2b" and args.engine == "pybamm":
         print("2b 零偏硬标准对齐 04-a F，改用 --engine ecm（不叠 SPM 墙）", flush=True)
+        args.engine = "ecm"
+    if args.exp == "2g" and args.engine == "pybamm":
+        print("2g 全包 hatQ 错对齐 04-a / 2B 波型，改用 --engine ecm（不叠 SPM 墙）", flush=True)
         args.engine = "ecm"
     if args.exp == "2c" and args.engine == "pybamm":
         print("2c 先拦后写对齐 2B 零偏 + SEQUENCE 1C 边沿，改用 --engine ecm", flush=True)
@@ -509,6 +526,7 @@ def main() -> None:
             "2a3": 203,
             "2a4": 204,
             "2b": 205,
+            "2g": 209,
             "2c": 208,
             "2e": 206,
             "2d1": 207,

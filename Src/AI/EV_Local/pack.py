@@ -72,6 +72,8 @@ def load_pack(pack_dir: Path) -> tuple[dict, dict[str, np.ndarray]]:
         raise RuntimeError(f"{exp} 必须 b_I=0")
     if exp == "2b" and abs(b_i - 5.0) > 1e-6:
         raise RuntimeError("2b 必须 b_I=5")
+    if exp == "2g" and abs(b_i) > 1e-6:
+        raise RuntimeError("2g 必须 b_I=0（不要和零偏叠）")
     if exp == "2c" and abs(b_i - 5.0) > 1e-6:
         raise RuntimeError("2c 必须 b_I=5")
     if exp == "2e" and abs(b_i) > 1e-6:
@@ -546,6 +548,18 @@ def main() -> None:
     p.add_argument("--dr0", action="store_true", help="EKF 慢变 δR0（2D）")
     p.add_argument("--r0-scale", type=float, default=1.0, help="放大 MLP 读出的 R0，2D 用 1.06")
     p.add_argument(
+        "--capacity-scale",
+        type=float,
+        default=None,
+        help="EKF/Ah 容量乘子（对齐 KF/run.py）。默认读 pack.json；2G=0.95",
+    )
+    p.add_argument(
+        "--capacity-ah",
+        type=float,
+        default=None,
+        help="规格书容量 Ah；默认 100 或 pack.json capacity_ah_true",
+    )
+    p.add_argument(
         "--k-after-trips",
         type=int,
         default=1,
@@ -561,10 +575,27 @@ def main() -> None:
     meta, data = load_pack(pack_dir)
     cells = meta["cells"]
     n = int(meta["n"])
+    q_true = float(
+        args.capacity_ah
+        if args.capacity_ah is not None
+        else meta.get("capacity_ah_true", meta.get("capacity_ah", 100.0))
+    )
+    if args.capacity_scale is not None:
+        cap_scale = float(args.capacity_scale)
+    elif "capacity_scale" in meta:
+        cap_scale = float(meta["capacity_scale"])
+    elif "hat_q_ah" in meta:
+        cap_scale = float(meta["hat_q_ah"]) / q_true
+    else:
+        cap_scale = 1.0
+    hat_q = float(meta.get("hat_q_ah", q_true * cap_scale))
+    if str(meta.get("exp")) == "2g" and abs(cap_scale - 0.95) > 1e-3:
+        raise RuntimeError(f"2g 需要 capacity_scale=0.95（现在 {cap_scale:g}）")
     print(
         f"pack {meta['exp']} n={n} engine={meta.get('engine')} b_I={meta.get('b_I')}  "
         f"mode={args.mode} mlp={mlp_dir}  r0_scale={args.r0_scale:g} dr0={int(args.dr0)}  "
-        f"k_after_trips={args.k_after_trips}",
+        f"k_after_trips={args.k_after_trips}  "
+        f"Q={q_true:g}Ah hatQ={hat_q:g}Ah scale={cap_scale:g}",
         flush=True,
     )
 
@@ -575,7 +606,11 @@ def main() -> None:
         par.requires_grad_(False)
     base = base.to(device).eval()
     provider = MlpParamProvider(base, scaler, device=device, r0_scale=args.r0_scale)
-    kf_cfg = KfConfig(estimate_dr0=bool(args.dr0))
+    # 对齐 KF/run.py：capacity_ah * capacity_scale 进 EKF/Ah 分母
+    kf_cfg = KfConfig(
+        estimate_dr0=bool(args.dr0),
+        capacity_ah=q_true * cap_scale,
+    )
 
     ocv_fn, docv_fn = ocv_nmc, docv_ds
     if str(meta.get("engine", "ecm")).lower() == "pybamm":
@@ -751,6 +786,9 @@ def main() -> None:
         "n": n,
         "b_I": meta.get("b_I"),
         "r0_scale": args.r0_scale,
+        "capacity_ah_true": q_true,
+        "hat_q_ah": hat_q,
+        "capacity_scale": cap_scale,
         "dr0": bool(args.dr0),
         "k_after_trips": int(args.k_after_trips),
         "k_soc": "pred" if str(meta["exp"]) == "2c" else "ah",
@@ -875,6 +913,19 @@ def main() -> None:
                 print(
                     f"WARN 2B ifx_demo 应全包同号大改 k（up/dn="
                     f"{summary.get('n_k0_up')}/{summary.get('n_k0_dn')}）"
+                )
+    if meta["exp"] == "2g":
+        if abs(cap_scale - 0.95) > 1e-3:
+            print(f"WARN 2G capacity_scale 应为 0.95（现在 {cap_scale:g}）")
+        if args.dr0:
+            print("WARN 2G 不要开 δR0 去跟容量斜坡")
+        if do_k and not nogate:
+            if not gate["blocked"]:
+                print("WARN 2G 包级门应触发")
+            if summary.get("n_k0_in_1pm03", n) < n:
+                print(
+                    f"WARN 2G 主档 k 应保持 1（in_1±0.03="
+                    f"{summary.get('n_k0_in_1pm03')}/{n}）"
                 )
     if meta["exp"] == "2e":
         if do_k and not nogate:
