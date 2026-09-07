@@ -1,0 +1,97 @@
+{
+  "phase": "3B",
+  "n_files": 25,
+  "grid": "Data/grid_pybamm",
+  "clip_mv": 8.0,
+  "used_ai_mlp": false,
+  "bv_ocp_labels": false,
+  "caveats": [
+    "Subset: regenerated Data/grid_pybamm 5\u00d75 (25 SEQUENCE cases), no measurement noise.",
+    "Proper teacher = U_py - U_2RC (LTI 2RC per file); BV/OCP labels not applied.",
+    "\u03b4U clip tried at 8 mV; GRU d=4; freeze \u03b8 for increment not exercised here (open-loop only).",
+    "Rest SOC / NIS not computed (open-loop voltage study)."
+  ],
+  "table_mv": {
+    "col1_1rc": {
+      "all": 14.576732755880457,
+      "edge": 17.865124147431057,
+      "pulse_first_30s": 13.731825385197805,
+      "rest_60_120s": 18.51582295422032,
+      "rest": 13.705545357994978,
+      "dis1c": 15.664969084990664,
+      "rest_after_1c": 19.230384117172456,
+      "chg": 9.078081540389624,
+      "dis2c": 12.25579538175949
+    },
+    "col2_2rc": {
+      "all": 9.890987558875413,
+      "edge": 18.519473071518238,
+      "pulse_first_30s": 18.802962992809636,
+      "rest_60_120s": 6.15271152850878,
+      "rest": 6.287897187350267,
+      "dis1c": 6.0282987094914064,
+      "rest_after_1c": 5.995556438673909,
+      "chg": 14.66527587109229,
+      "dis2c": 37.11648907340478
+    },
+    "col4_proper": {
+      "all": 11.918500177580404,
+      "edge": 15.265679071480912,
+      "pulse_first_30s": 12.842250301338229,
+      "rest_60_120s": 13.020015891757069,
+      "rest": 10.286614893428913,
+      "dis1c": 12.725557969915007,
+      "rest_after_1c": 14.26470274644109,
+      "chg": 10.281368780201877,
+      "dis2c": 11.520812856709444
+    },
+    "col4_diagnostic": {
+      "all": 9.21376232698703,
+      "edge": 12.94290977849168,
+      "pulse_first_30s": 8.23211769065045,
+      "rest_60_120s": 10.708276944911386,
+      "rest": 8.216475751937093,
+      "dis1c": 9.874925615910389,
+      "rest_after_1c": 11.997010732983647,
+      "chg": 3.8711394613147228,
+      "dis2c": 6.706046988782958
+    }
+  },
+  "3B2_gain_vs_col1": {
+    "all": 2.658232578300053,
+    "edge": 2.599445075950145,
+    "pulse_first_30s": 0.889575083859576,
+    "rest_60_120s": 5.49580706246325,
+    "rest": 3.418930464566065,
+    "dis1c": 2.939411115075657,
+    "rest_after_1c": 4.965681370731366,
+    "chg": -1.2032872398122532,
+    "dis2c": 0.7349825250500466
+  },
+  "3B3": {
+    "beats_2rc_all": false,
+    "upgrade_priority": true,
+    "col4_minus_col2_mv": {
+      "all": 2.027512618704991,
+      "edge": -3.2537940000373258,
+      "pulse_first_30s": -5.960712691471407,
+      "rest_60_120s": 6.867304363248289,
+      "rest": 3.9987177060786463,
+      "dis1c": 6.697259260423601,
+      "rest_after_1c": 8.26914630776718,
+      "chg": -4.383907090890412,
+      "dis2c": -25.595676216695335
+    }
+  },
+  "3B4": {
+    "fail_control": true,
+    "fail_note": "FAIL\u5bf9\u7167: diagnostic head wins mainly on rest double-exp",
+    "rest_gain_mv": 7.807546009308933,
+    "pulse_gain_mv": 5.4997076945473555,
+    "raw_rest_looks_like_2nd_exp": true
+  },
+  "mlp_dir": "Branch/phase3_1rc_ai/out/mlp_pybamm",
+  "lut_dir": "Branch/phase3_1rc_ai/out/lut_pybamm",
+  "lut_rom_kb": 4.4296875,
+  "gru_n_params": 125
+}
