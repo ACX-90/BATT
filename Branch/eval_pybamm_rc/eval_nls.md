@@ -175,13 +175,13 @@ U_{\mathrm{ocp}}=U_+(y_{\mathrm{s}})-U_-(x_{\mathrm{s}}).
 NLS **能做**从现有序列估大致 2RC，而且是静置双指数的正确工具（可分离、两维、条件数 27、0.14 mV）。  
 NLS **不能**靠「整段五参数非线性最小二乘」同时交出可靠的 \(R_0,R_1,R_2,\tau_1,\tau_2\)：低温不可辨识，高温 \(\tau_2\) 沿山谷漂，缺的是 \(R_0(I)\) 和更长静置，不是更好的优化器。两端通电段直线是表面 OCP（§4.1），加 BV 只吃边沿；换 \(U_{\mathrm{ocp}}(c_{\mathrm{surf}})\) 之后 90% / 17 °C 整段剩 **2.3 mV**，末端从 +12 mV 降到 +1.4 mV。
 
-信封内（\(\gtrsim 10^\circ\mathrm{C}\)、SOC \(\gtrsim 28\%\)）2RC+BV+OCP 把开环收到约 **2 mV**，见 §7。对 2β 的含义见 [`Doc/06-c`](../../Doc/06-c-1RC查表残差与策略信封.md) §9。
+信封内（\(\gtrsim 10^\circ\mathrm{C}\)、SOC \(\gtrsim 28\%\)）2RC+BV+OCP 把开环收到约 **2 mV**，见 §7。对 2β 的含义见 [`Doc/07-b`](../../Doc/07-b-1RC查表残差与策略信封.md) §9。
 
 ---
 
 ## 7. 信封内：2RC+BV+OCP 能吃掉大部分残差
 
-对照 [`Doc/06-c`](../../Doc/06-c-1RC查表残差与策略信封.md) 的参考点。信封收成 **\(T\ge 10^\circ\mathrm{C}\)、SOC \(\gtrsim 28\%\)**（去掉 `s09`；本网格 SEQUENCE、等温 SPM）。数字 `out_nls/nls_ocp_summary.csv`，100 档。
+对照 [`Doc/07-b`](../../Doc/07-b-1RC查表残差与策略信封.md) 的参考点。信封收成 **\(T\ge 10^\circ\mathrm{C}\)、SOC \(\gtrsim 28\%\)**（去掉 `s09`；本网格 SEQUENCE、等温 SPM）。数字 `out_nls/nls_ocp_summary.csv`，100 档。
 
 | | 整段 RMSE p50 | p90 | max |
 |--|---------------|-----|-----|
