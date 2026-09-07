@@ -225,7 +225,7 @@ EKF 状态是 \((s,U_p)\)，MLP 用预测 SOC 出 \(R_0,R_1\)，ECM 给出先验
 | [`Doc/06-b-第2期包级对照实验.md`](Doc/06-b-第2期包级对照实验.md) | 第 2 期数字：2A1–2A4 / 2B / 2E / 2D / 2C / 2G / 2H1–2H3 / 2I1–2I3 已跑 |
 | [`Doc/07-a-查表支线与AI支线.md`](Doc/07-a-查表支线与AI支线.md) | 查表 / AI 两条支线；§2.2：规格书对 2RC 真数据仍成立，慢尾巴不写 \(k\) |
 | [`Doc/07-b-1RC查表残差与策略信封.md`](Doc/07-b-1RC查表残差与策略信封.md) | 2β 接法 Δ、策略信封；用 AI 写 \(k\) 评掉；影子 \(k\)；升 2RC 后仍只写 \(k\) |
-| [`Doc/07-c-第3期1RC与AI对照实验方案.md`](Doc/07-c-第3期1RC与AI对照实验方案.md) | 第 3 期方案：单芯 / 少量异常芯；1RC 底板 vs 2RC vs 1RC+AI \(\delta U\)；PyBaMM 预言机 |
+| [`Doc/07-c-第3期1RC与AI对照实验方案.md`](Doc/07-c-第3期1RC与AI对照实验方案.md) | 第 3 期方案：**默认 PyBaMM**；1RC+AI 接法/尺寸/训练细则；单芯对照 |
 | [`Doc/07-d-第3期对照实验.md`](Doc/07-d-第3期对照实验.md) | 第 3 期对照数字（尚无正式组） |
 | [`Doc/A0-a-TC4D7-PPU与800V系统融合评估.md`](Doc/A0-a-TC4D7-PPU与800V系统融合评估.md) | TC4D7+PPU、800 V 包上按 ifx_demo 评估，再谈优化 |
 | [`Doc/A0-b-ST与NXP的AI-MCU对照.md`](Doc/A0-b-ST与NXP的AI-MCU对照.md) | ST P3E / NXP S32K37·K5 与英飞凌 TC4D7 对照 |
